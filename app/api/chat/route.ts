@@ -315,10 +315,8 @@ ${relevantContext}
 
 Use this information to inform your responses, but speak like Clubman — a sharp, curious creative strategist.`
 
-    console.log('🤖 Creating Groq model...')
-    // Create the Groq model
-    const model = groq('llama-3.3-70b-versatile')
-
+    console.log('🤖 Building conversation messages...')
+    
     // Build conversation messages with system prompt
     const conversationMessages = [
       { role: 'system' as const, content: systemPrompt },
@@ -338,10 +336,10 @@ Use this information to inform your responses, but speak like Clubman — a shar
         'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
+        model: 'llama-3.1-8b-instant',
         messages: conversationMessages,
         temperature: 0.7,
-        max_tokens: 1000,
+        max_tokens: 500,
       }),
     })
 
