@@ -6,6 +6,7 @@ A full-featured local RAG (Retrieval-Augmented Generation) chatbot built with Ne
 
 - **RAG System**: Retrieval-Augmented Generation using local markdown knowledge base
 - **Vector Similarity Search**: Cosine similarity search for relevant information retrieval
+- **Persistent Memory**: Long-term conversation memory using Mem0 AI
 - **Streaming Responses**: Real-time streaming chat powered by Groq's fast inference
 - **Modern UI**: Clean, responsive chat interface with Tailwind CSS
 - **TypeScript**: Full type safety throughout the application
@@ -16,6 +17,7 @@ A full-featured local RAG (Retrieval-Augmented Generation) chatbot built with Ne
 - **Framework**: Next.js 14 with TypeScript
 - **AI SDK**: Vercel AI SDK v3.0+
 - **LLM Provider**: Groq (Llama 3.3 70B)
+- **Memory Layer**: Mem0 AI for persistent conversation memory
 - **Embeddings**: OpenAI text-embedding-ada-002
 - **Vector Search**: In-memory cosine similarity
 - **Styling**: Tailwind CSS (via class names)
@@ -84,12 +86,15 @@ Create a `.env.local` file in the root directory:
 ```env
 # Required: Groq API Key for chat completions
 GROQ_API_KEY=your_groq_api_key_here
+
+# Required: OpenAI API Key for memory embeddings
+OPENAI_API_KEY=your_openai_api_key_here
 ```
 
 **Getting API Keys:**
 
 - **Groq**: Sign up at [console.groq.com](https://console.groq.com) and create an API key
-- **Note**: OpenAI embeddings are currently disabled, using text-based search instead
+- **OpenAI**: Sign up at [platform.openai.com](https://platform.openai.com) and create an API key for embeddings
 
 ### 4. Run the Application
 
@@ -98,7 +103,40 @@ GROQ_API_KEY=your_groq_api_key_here
 npm run dev
 
 # Open http://localhost:3000 in your browser
-```
+
+## 🧠 Chat Logging System
+
+The AI assistant now includes persistent chat logging using [Mem0 AI](https://docs.mem0.ai/). This allows you to:
+
+- **Log all user messages** with metadata and timestamps
+- **Log all AI responses** for complete conversation tracking
+- **Export conversation history** per user
+- **Analyze chat patterns** and user interactions
+
+### Logging Features
+
+- **Automatic Logging**: All user messages and AI responses are automatically logged
+- **Metadata Tracking**: Timestamps, session IDs, project types, and platform info
+- **Vector Storage**: Messages are stored as vectorized records for future analysis
+- **Simple Retrieval**: Easy export and query capabilities
+
+### Testing Chat Logs
+
+Visit `/test-memory` to view and manage stored chat logs:
+
+- **Session-based organization** - Conversations grouped by session
+- **Collapsible conversations** - Click to expand full conversations
+- **Message previews** - See first and last messages at a glance
+- **Rich metadata** - View timestamps, project types, and session info
+- **Delete functionality** - Clear logs for testing
+
+### Logging Configuration
+
+The logging system uses:
+- **Storage**: Local JSON file (`logs/chat_logs.json`) for persistence
+- **No API Dependencies**: Works completely offline
+- **Metadata**: Rich metadata including timestamps, session IDs, and user info
+- **CSV Export**: Download logs for analysis in Excel/Google Sheets
 
 ## 💡 How It Works
 

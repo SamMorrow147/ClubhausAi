@@ -1,0 +1,83 @@
+[
+  {
+    "id": "user_1754021450008_1u9knsol0",
+    "userId": "anonymous",
+    "sessionId": "session_1754021450008",
+    "role": "user",
+    "content": "hello",
+    "timestamp": "2025-08-01T04:10:50.008Z",
+    "metadata": {
+      "sessionId": "session_1754021450008",
+      "platform": "chat_ui",
+      "type": "user_input"
+    }
+  },
+  {
+    "id": "ai_1754021450652_hvvzk8zik",
+    "userId": "anonymous",
+    "sessionId": "session_1754021450008",
+    "role": "assistant",
+    "content": "Welcome to the club",
+    "timestamp": "2025-08-01T04:10:50.652Z",
+    "metadata": {
+      "sessionId": "session_1754021450008",
+      "projectType": "general",
+      "platform": "chat_ui",
+      "type": "ai_response"
+    }
+  },
+  {
+    "id": "user_1754021590277_p5gjoikz2",
+    "userId": "anonymous",
+    "sessionId": "session_1754021590277",
+    "role": "user",
+    "content": "yo",
+    "timestamp": "2025-08-01T04:13:10.277Z",
+    "metadata": {
+      "sessionId": "session_1754021590277",
+      "platform": "chat_ui",
+      "type": "user_input"
+    }
+  },
+  {
+    "id": "ai_1754021590786_pcc0q5qhd",
+    "userId": "anonymous",
+    "sessionId": "session_1754021590277",
+    "role": "assistant",
+    "content": "What's on your mind?",
+    "timestamp": "2025-08-01T04:13:10.786Z",
+    "metadata": {
+      "sessionId": "session_1754021590277",
+      "projectType": "general",
+      "platform": "chat_ui",
+      "type": "ai_response"
+    }
+  },
+  {
+    "id": "user_1754021736614_2d0bz2xi5",
+    "userId": "anonymous",
+    "sessionId": "session_1754021736614",
+    "role": "user",
+    "content": "wassup",
+    "timestamp": "2025-08-01T04:15:36.614Z",
+    "metadata": {
+      "sessionId": "session_1754021736614",
+      "platform": "chat_ui",
+      "type": "user_input"
+    }
+  },
+  {
+    "id": "ai_1754021737164_zi85lbxn3",
+    "userId": "anonymous",
+    "sessionId": "session_1754021736614",
+    "role": "assistant",
+    "content": "Not much, just hanging out in the club. What's new with you?",
+    "timestamp": "2025-08-01T04:15:37.164Z",
+    "metadata": {
+      "sessionId": "session_1754021736614",
+      "projectType": "general",
+      "platform": "chat_ui",
+      "type": "ai_response"
+    }
+  }
+]

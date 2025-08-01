@@ -6,6 +6,7 @@ import { findStrategicResponse, formatStrategicResponse } from '../../../lib/res
 import { createBreweryResponse, BreweryConversationState } from '../../../lib/breweryHandler'
 import { createMuralResponse, MuralConversationState } from '../../../lib/muralHandler'
 import { checkProjectTriggers } from '../../../lib/projectHandler'
+import SimpleLogger from '../../../lib/simpleLogger'
 
 // Create Groq provider instance
 const groq = createGroq({
@@ -111,6 +112,16 @@ export async function POST(req: Request) {
     }
 
     console.log('📝 User message:', lastMessage.content)
+
+    // Initialize simple logger for chat logging
+    const logger = SimpleLogger.getInstance()
+    const userId = 'anonymous' // In a real app, this would come from authentication
+    const sessionId = `session_${Date.now()}`
+    
+    // Log the user message
+    await logger.logUserMessage(userId, lastMessage.content, {
+      sessionId
+    })
 
     // Check for project triggers first
     const projectTrigger = checkProjectTriggers(lastMessage.content)
@@ -424,6 +435,17 @@ Use this information to inform your responses, but speak like Clubman — a shar
     if (hasFalsePromise) {
       console.log('🚫 Intercepted false promise, replacing with team follow-up message')
       aiResponse = "I can't do that myself, but a Clubhaus team member will follow up to help with that."
+    }
+
+    // Log the AI response
+    try {
+      await logger.logAIResponse(userId, aiResponse, {
+        sessionId,
+        projectType: detectedProjectType || 'general'
+      })
+    } catch (memoryError) {
+      console.error('❌ Failed to log AI response:', memoryError)
+      // Don't fail the request if logging fails
     }
 
     // Return the response
