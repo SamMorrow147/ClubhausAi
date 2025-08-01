@@ -1,4 +1,4 @@
-import { kv } from '@vercel/kv'
+import { createClient } from 'redis'
 
 export interface ChatLog {
   id: string
@@ -12,6 +12,8 @@ export interface ChatLog {
 
 export class DatabaseLogger {
   private static instance: DatabaseLogger
+  private redis: any = null
+  private isConnected: boolean = false
 
   private constructor() {}
 
@@ -20,6 +22,30 @@ export class DatabaseLogger {
       DatabaseLogger.instance = new DatabaseLogger()
     }
     return DatabaseLogger.instance
+  }
+
+  private async getRedisClient() {
+    if (this.redis && this.isConnected) {
+      return this.redis
+    }
+
+    try {
+      // Use Vercel KV environment variables
+      const redis = createClient({
+        url: process.env.KV_REST_API_URL,
+        password: process.env.KV_REST_API_TOKEN,
+      })
+
+      await redis.connect()
+      this.redis = redis
+      this.isConnected = true
+      console.log('✅ Redis client connected')
+      return redis
+    } catch (error) {
+      console.error('❌ Failed to connect to Redis:', error)
+      this.isConnected = false
+      return null
+    }
   }
 
   /**
@@ -31,6 +57,12 @@ export class DatabaseLogger {
     metadata: Record<string, any> = {}
   ): Promise<void> {
     try {
+      const redis = await this.getRedisClient()
+      if (!redis) {
+        console.log('⚠️ Redis not available, skipping log')
+        return
+      }
+
       const sessionId = metadata.sessionId || `session_${Date.now()}`
       
       const logEntry: ChatLog = {
@@ -47,18 +79,18 @@ export class DatabaseLogger {
         }
       }
 
-      // Store in KV with a unique key
+      // Store in Redis with a unique key
       const key = `chat_log:${logEntry.id}`
-      await kv.set(key, logEntry)
+      await redis.set(key, JSON.stringify(logEntry))
       
       // Also store in a list for easy retrieval
-      await kv.lpush(`user_logs:${userId}`, logEntry.id)
-      await kv.lpush(`session_logs:${sessionId}`, logEntry.id)
+      await redis.lPush(`user_logs:${userId}`, logEntry.id)
+      await redis.lPush(`session_logs:${sessionId}`, logEntry.id)
       
       // Set expiration for cleanup (30 days)
-      await kv.expire(key, 30 * 24 * 60 * 60)
-      await kv.expire(`user_logs:${userId}`, 30 * 24 * 60 * 60)
-      await kv.expire(`session_logs:${sessionId}`, 30 * 24 * 60 * 60)
+      await redis.expire(key, 30 * 24 * 60 * 60)
+      await redis.expire(`user_logs:${userId}`, 30 * 24 * 60 * 60)
+      await redis.expire(`session_logs:${sessionId}`, 30 * 24 * 60 * 60)
 
       console.log('📝 Logged user message for user:', userId, '(Database)')
     } catch (error) {
@@ -76,6 +108,12 @@ export class DatabaseLogger {
     metadata: Record<string, any> = {}
   ): Promise<void> {
     try {
+      const redis = await this.getRedisClient()
+      if (!redis) {
+        console.log('⚠️ Redis not available, skipping log')
+        return
+      }
+
       const sessionId = metadata.sessionId || `session_${Date.now()}`
       
       const logEntry: ChatLog = {
@@ -92,18 +130,18 @@ export class DatabaseLogger {
         }
       }
 
-      // Store in KV with a unique key
+      // Store in Redis with a unique key
       const key = `chat_log:${logEntry.id}`
-      await kv.set(key, logEntry)
+      await redis.set(key, JSON.stringify(logEntry))
       
       // Also store in a list for easy retrieval
-      await kv.lpush(`user_logs:${userId}`, logEntry.id)
-      await kv.lpush(`session_logs:${sessionId}`, logEntry.id)
+      await redis.lPush(`user_logs:${userId}`, logEntry.id)
+      await redis.lPush(`session_logs:${sessionId}`, logEntry.id)
       
       // Set expiration for cleanup (30 days)
-      await kv.expire(key, 30 * 24 * 60 * 60)
-      await kv.expire(`user_logs:${userId}`, 30 * 24 * 60 * 60)
-      await kv.expire(`session_logs:${sessionId}`, 30 * 24 * 60 * 60)
+      await redis.expire(key, 30 * 24 * 60 * 60)
+      await redis.expire(`user_logs:${userId}`, 30 * 24 * 60 * 60)
+      await redis.expire(`session_logs:${sessionId}`, 30 * 24 * 60 * 60)
 
       console.log('🤖 Logged AI response for user:', userId, '(Database)')
     } catch (error) {
@@ -117,12 +155,19 @@ export class DatabaseLogger {
    */
   async getAllChatLogs(userId: string): Promise<ChatLog[]> {
     try {
-      const logIds = await kv.lrange(`user_logs:${userId}`, 0, -1)
+      const redis = await this.getRedisClient()
+      if (!redis) {
+        console.log('⚠️ Redis not available, returning empty logs')
+        return []
+      }
+
+      const logIds = await redis.lRange(`user_logs:${userId}`, 0, -1)
       const logs: ChatLog[] = []
       
       for (const id of logIds) {
-        const log = await kv.get(`chat_log:${id}`) as ChatLog
-        if (log) {
+        const logData = await redis.get(`chat_log:${id}`)
+        if (logData) {
+          const log = JSON.parse(logData) as ChatLog
           logs.push(log)
         }
       }
@@ -140,13 +185,20 @@ export class DatabaseLogger {
    */
   async getAllLogs(): Promise<ChatLog[]> {
     try {
-      // This is more complex with KV, so we'll use a pattern to get all logs
-      const keys = await kv.keys('chat_log:*')
+      const redis = await this.getRedisClient()
+      if (!redis) {
+        console.log('⚠️ Redis not available, returning empty logs')
+        return []
+      }
+
+      // Get all chat log keys
+      const keys = await redis.keys('chat_log:*')
       const logs: ChatLog[] = []
       
       for (const key of keys) {
-        const log = await kv.get(key) as ChatLog
-        if (log) {
+        const logData = await redis.get(key)
+        if (logData) {
+          const log = JSON.parse(logData) as ChatLog
           logs.push(log)
         }
       }
@@ -164,12 +216,19 @@ export class DatabaseLogger {
    */
   async getLogsBySession(sessionId: string): Promise<ChatLog[]> {
     try {
-      const logIds = await kv.lrange(`session_logs:${sessionId}`, 0, -1)
+      const redis = await this.getRedisClient()
+      if (!redis) {
+        console.log('⚠️ Redis not available, returning empty logs')
+        return []
+      }
+
+      const logIds = await redis.lRange(`session_logs:${sessionId}`, 0, -1)
       const logs: ChatLog[] = []
       
       for (const id of logIds) {
-        const log = await kv.get(`chat_log:${id}`) as ChatLog
-        if (log) {
+        const logData = await redis.get(`chat_log:${id}`)
+        if (logData) {
+          const log = JSON.parse(logData) as ChatLog
           logs.push(log)
         }
       }
@@ -187,15 +246,21 @@ export class DatabaseLogger {
    */
   async deleteAllChatLogs(userId: string): Promise<void> {
     try {
-      const logIds = await kv.lrange(`user_logs:${userId}`, 0, -1)
+      const redis = await this.getRedisClient()
+      if (!redis) {
+        console.log('⚠️ Redis not available, skipping delete')
+        return
+      }
+
+      const logIds = await redis.lRange(`user_logs:${userId}`, 0, -1)
       
       // Delete individual log entries
       for (const id of logIds) {
-        await kv.del(`chat_log:${id}`)
+        await redis.del(`chat_log:${id}`)
       }
       
       // Delete the user's log list
-      await kv.del(`user_logs:${userId}`)
+      await redis.del(`user_logs:${userId}`)
       
       console.log('🗑️ Deleted all chat logs for user:', userId, '(Database)')
     } catch (error) {
@@ -208,19 +273,25 @@ export class DatabaseLogger {
    */
   async resetAllChatLogs(): Promise<void> {
     try {
-      const keys = await kv.keys('chat_log:*')
+      const redis = await this.getRedisClient()
+      if (!redis) {
+        console.log('⚠️ Redis not available, skipping reset')
+        return
+      }
+
+      const keys = await redis.keys('chat_log:*')
       for (const key of keys) {
-        await kv.del(key)
+        await redis.del(key)
       }
       
-      const userKeys = await kv.keys('user_logs:*')
+      const userKeys = await redis.keys('user_logs:*')
       for (const key of userKeys) {
-        await kv.del(key)
+        await redis.del(key)
       }
       
-      const sessionKeys = await kv.keys('session_logs:*')
+      const sessionKeys = await redis.keys('session_logs:*')
       for (const key of sessionKeys) {
-        await kv.del(key)
+        await redis.del(key)
       }
       
       console.log('🔄 Reset all chat logs (Database)')
@@ -270,13 +341,29 @@ export class DatabaseLogger {
    */
   async testConnection(): Promise<boolean> {
     try {
-      await kv.set('test_connection', 'ok')
-      const result = await kv.get('test_connection')
-      await kv.del('test_connection')
+      const redis = await this.getRedisClient()
+      if (!redis) {
+        return false
+      }
+
+      await redis.set('test_connection', 'ok')
+      const result = await redis.get('test_connection')
+      await redis.del('test_connection')
       return result === 'ok'
     } catch (error) {
       console.error('❌ Database connection test failed:', error)
       return false
+    }
+  }
+
+  /**
+   * Close Redis connection
+   */
+  async disconnect(): Promise<void> {
+    if (this.redis && this.isConnected) {
+      await this.redis.disconnect()
+      this.isConnected = false
+      console.log('🔌 Redis client disconnected')
     }
   }
 }
