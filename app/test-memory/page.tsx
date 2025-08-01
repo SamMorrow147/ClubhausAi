@@ -12,6 +12,16 @@ interface ChatLog {
   metadata?: Record<string, any>
 }
 
+interface UserProfile {
+  userId: string
+  name?: string
+  email?: string
+  phone?: string
+  createdAt: string
+  updatedAt: string
+  sessionId: string
+}
+
 interface ConversationSession {
   sessionId: string
   logs: ChatLog[]
@@ -20,6 +30,7 @@ interface ConversationSession {
   lastMessage: string
   startTime: string
   endTime: string
+  userProfile?: UserProfile
 }
 
 interface EnvironmentInfo {
@@ -76,6 +87,17 @@ export default function TestMemoryPage() {
         const firstLog = sortedLogs[0]
         const lastLog = sortedLogs[sortedLogs.length - 1]
         
+        // Extract user profile from the most recent log that has it
+        let userProfile: UserProfile | undefined = undefined
+        for (const log of sortedLogs.reverse()) {
+          if (log.metadata?.userProfile) {
+            userProfile = log.metadata.userProfile
+            break
+          }
+        }
+        // Reverse back to maintain chronological order
+        sortedLogs.reverse()
+        
         return {
           sessionId,
           logs: sortedLogs,
@@ -83,7 +105,8 @@ export default function TestMemoryPage() {
           firstMessage: firstLog.content.substring(0, 50) + (firstLog.content.length > 50 ? '...' : ''),
           lastMessage: lastLog.content.substring(0, 50) + (lastLog.content.length > 50 ? '...' : ''),
           startTime: firstLog.timestamp,
-          endTime: lastLog.timestamp
+          endTime: lastLog.timestamp,
+          userProfile
         }
       })
       
@@ -209,6 +232,53 @@ export default function TestMemoryPage() {
                     className="p-4 cursor-pointer hover:bg-gray-600 transition-colors"
                     onClick={() => toggleSession(session.sessionId)}
                   >
+                    {/* User Profile Information */}
+                    <div className="mb-3 p-3 bg-gray-600 rounded-lg border-l-4 border-blue-500">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <span className="text-blue-400 font-semibold">👤 User Information</span>
+                      </div>
+                      {session.userProfile ? (
+                        <>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
+                            <div className="flex items-center space-x-2">
+                              <span className="text-gray-400">Name:</span>
+                              <span className="text-white">
+                                {session.userProfile.name || <span className="text-gray-500 italic">Not provided</span>}
+                              </span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <span className="text-gray-400">Email:</span>
+                              <span className="text-white">
+                                {session.userProfile.email || <span className="text-gray-500 italic">Not provided</span>}
+                              </span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <span className="text-gray-400">Phone:</span>
+                              <span className="text-white">
+                                {session.userProfile.phone || <span className="text-gray-500 italic">Not provided</span>}
+                              </span>
+                            </div>
+                          </div>
+                          {/* Completion indicator */}
+                          <div className="mt-2 flex items-center space-x-2">
+                            <span className="text-xs text-gray-400">Profile completion:</span>
+                            <div className="flex space-x-1">
+                              <div className={`w-2 h-2 rounded-full ${session.userProfile.name ? 'bg-green-500' : 'bg-gray-500'}`} title="Name"></div>
+                              <div className={`w-2 h-2 rounded-full ${session.userProfile.email ? 'bg-green-500' : 'bg-gray-500'}`} title="Email"></div>
+                              <div className={`w-2 h-2 rounded-full ${session.userProfile.phone ? 'bg-green-500' : 'bg-gray-500'}`} title="Phone"></div>
+                            </div>
+                            <span className="text-xs text-gray-400">
+                              ({[session.userProfile.name, session.userProfile.email, session.userProfile.phone].filter(Boolean).length}/3)
+                            </span>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="text-sm text-gray-400 italic">
+                          No user information collected in this session
+                        </div>
+                      )}
+                    </div>
+                    
                     <div className="flex justify-between items-center">
                       <div className="flex-1">
                         <div className="flex items-center space-x-3">

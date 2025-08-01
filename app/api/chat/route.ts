@@ -7,6 +7,7 @@ import { createBreweryResponse, BreweryConversationState } from '../../../lib/br
 import { createMuralResponse, MuralConversationState } from '../../../lib/muralHandler'
 import { checkProjectTriggers } from '../../../lib/projectHandler'
 import SimpleLogger from '../../../lib/simpleLogger'
+import UserProfileService from '../../../lib/userProfileService'
 
 // Create Groq provider instance
 const groq = createGroq({
@@ -115,12 +116,23 @@ export async function POST(req: Request) {
 
     // Initialize simple logger for chat logging
     const logger = SimpleLogger.getInstance()
+    const userProfileService = UserProfileService.getInstance()
     const userId = 'anonymous' // In a real app, this would come from authentication
     const sessionId = providedSessionId || `session_${Date.now()}`
     
+    // Extract user information from the message
+    const extractedInfo = userProfileService.extractUserInfoFromMessage(lastMessage.content)
+    
+    // Update user profile if any info was extracted
+    if (Object.keys(extractedInfo).length > 0) {
+      console.log('👤 Extracted user info:', extractedInfo)
+      await userProfileService.updateUserProfile(userId, sessionId, extractedInfo)
+    }
+    
     // Log the user message
     await logger.logUserMessage(userId, lastMessage.content, {
-      sessionId
+      sessionId,
+      extractedProfile: Object.keys(extractedInfo).length > 0 ? extractedInfo : undefined
     })
 
     // Check for project triggers first
@@ -248,6 +260,16 @@ export async function POST(req: Request) {
       console.log('🎯 Detected project type:', detectedProjectType)
     }
 
+    // Get user profile status for context
+    const userInfoStatus = await userProfileService.getUserInfoStatus(userId, sessionId)
+    const nextInfoToCollect = await userProfileService.getNextInfoToCollect(userId, sessionId)
+    const userProfile = await userProfileService.getUserProfile(userId, sessionId)
+    
+    console.log('👤 User info status:', userInfoStatus)
+    if (nextInfoToCollect) {
+      console.log('👤 Next info to collect:', nextInfoToCollect)
+    }
+
     // Load knowledge base and search for relevant content
     const knowledgeContent = loadKnowledgeBase()
     const relevantContext = searchKnowledge(lastMessage.content, knowledgeContent)
@@ -265,6 +287,31 @@ The user is asking about ${detectedProjectType}. Use these discovery questions i
 ${projectQuestions.map((q, i) => `${i + 1}. ${q}`).join('\n')}
 
 Acknowledge their request naturally, then ask 1-2 of these questions. Keep it conversational and under 80 words.`
+    }
+
+    // User information collection guidance
+    let userInfoGuidance = ''
+    if (!userInfoStatus.isComplete) {
+      const missingInfo = []
+      if (!userInfoStatus.hasName) missingInfo.push('name')
+      if (!userInfoStatus.hasEmail) missingInfo.push('email')  
+      if (!userInfoStatus.hasPhone) missingInfo.push('phone number')
+      
+      userInfoGuidance = `
+🎯 USER INFORMATION COLLECTION:
+Missing user info: ${missingInfo.join(', ')}
+
+IMPORTANT: Always try to collect the user's name, email, and phone number early in the conversation. Ask casually and naturally, not all at once unless it makes sense. Be polite and helpful.
+
+${nextInfoToCollect ? `Next to collect: ${nextInfoToCollect}` : ''}
+
+Guidelines:
+- Weave requests for missing information naturally into your responses
+- Don't make it feel like a form - keep it conversational
+- If they're asking for help with a project, you can say something like "I'd love to help with that! What should I call you?" 
+- For email: "What's your email so we can follow up with more details?"
+- For phone: "What's the best number to reach you at?"
+- Once you have all three pieces of information, don't ask again`
     }
 
     const systemPrompt = `You are the Clubhaus AI assistant. You represent a creative agency that values sharp thinking, curiosity, and clarity.
@@ -322,7 +369,7 @@ Do NOT start by guessing the problem. This will steer you toward better discover
 - Never list more than 2 services in a single response
 - End responses with questions when appropriate
 - Avoid phrases like "I'm not sure" unless you clarify that you're an AI and a team member can follow up
-- Strategic responses for pricing/service questions take priority over general knowledge base responses${projectGuidance}
+- Strategic responses for pricing/service questions take priority over general knowledge base responses${projectGuidance}${userInfoGuidance}
 
 KNOWLEDGE BASE CONTEXT:
 ${relevantContext}
