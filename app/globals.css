@@ -1,0 +1,732 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222.2 84% 4.9%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222.2 84% 4.9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    --radius: 0.75rem;
+    
+    /* Glowing card variables */
+    --glow-sens: 30;
+    --card-bg: linear-gradient(8deg, hsl(222.2 84% 4.9%) 75%, color-mix(in hsl, hsl(222.2 84% 4.9%), white 2.5%) 75.5%);
+    --blend: soft-light;
+    --glow-blend: plus-lighter;
+    --glow-color: 40deg 80% 80%;
+    --h: 260;
+    --dark: hsl(222.2 84% 4.9%);
+    --fg: hsl(210 40% 98%);
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 84% 4.9%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 224.3 76.3% 94.1%;
+    
+    /* Dark mode glowing card variables */
+    --card-bg: linear-gradient(8deg, hsl(222.2 84% 4.9%) 75%, color-mix(in hsl, hsl(222.2 84% 4.9%), white 2.5%) 75.5%);
+    --blend: soft-light;
+    --glow-blend: plus-lighter;
+    --glow-color: 40deg 80% 80%;
+    --h: 260;
+    --dark: hsl(222.2 84% 4.9%);
+    --fg: hsl(210 40% 98%);
+  }
+
+  .light {
+    --card-bg: linear-gradient(8deg, color-mix(in hsl, hsl(260, 25%, 95%), hsl(222.2 84% 4.9%) 2.5%) 75%, hsl(260, 25%, 95%) 75.5%);
+    --blend: darken;
+    --glow-blend: luminosity;
+    --glow-color: 280deg 90% 95%;
+    --fg: hsl(222.2 84% 4.9%);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    height: 100svh;
+    overflow: auto;
+    background: hsl(var(--h), 18%, 12%);
+  }
+}
+
+/* Glowing card styles */
+.glow-card {
+  --pads: 40px;
+  --color-sens: calc(var(--glow-sens) + 20);
+  
+  position: relative;
+  width: clamp(320px, calc(100svw - calc(var(--pads) * 2)), 800px);
+  height: calc(100svh - calc(var(--pads) * 2));
+  max-height: 700px;
+  border-radius: 1.768em;
+  isolation: isolate;
+  transform: translate3d(0, 0, 0.01px);
+  display: grid;
+  border: 1px solid rgb(255 255 255 / 25%);
+  background: var(--card-bg);
+  background-repeat: no-repeat;
+  box-shadow: 
+    rgba(0, 0, 0, 0.1) 0px 1px 2px, 
+    rgba(0, 0, 0, 0.1) 0px 2px 4px, 
+    rgba(0, 0, 0, 0.1) 0px 4px 8px, 
+    rgba(0, 0, 0, 0.1) 0px 8px 16px, 
+    rgba(0, 0, 0, 0.1) 0px 16px 32px, 
+    rgba(0, 0, 0, 0.1) 0px 32px 64px;
+}
+
+.glow-card::before,
+.glow-card::after,
+.glow-card > .glow {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  transition: opacity 0.25s ease-out;
+  z-index: -1;
+}
+
+.glow-card:not(:hover):not(.animating)::before,
+.glow-card:not(:hover):not(.animating)::after,
+.glow-card:not(:hover):not(.animating) > .glow {
+  opacity: 0;
+  transition: opacity 0.75s ease-in-out;
+}
+
+.glow-card::before {
+  border: 1px solid transparent;
+  
+  background:
+    linear-gradient(var(--card-bg) 0 100%) padding-box,
+    linear-gradient(rgb(255 255 255 / 0%) 0% 100%) border-box,
+    radial-gradient(at 80% 55%, hsla(268,100%,76%,1) 0px, transparent 50%) border-box,
+    radial-gradient(at 69% 34%, hsla(349,100%,74%,1) 0px, transparent 50%) border-box,
+    radial-gradient(at 8% 6%, hsla(136,100%,78%,1) 0px, transparent 50%) border-box,
+    radial-gradient(at 41% 38%, hsla(192,100%,64%,1) 0px, transparent 50%) border-box,
+    radial-gradient(at 86% 85%, hsla(186,100%,74%,1) 0px, transparent 50%) border-box,
+    radial-gradient(at 82% 18%, hsla(52,100%,65%,1) 0px, transparent 50%) border-box,
+    radial-gradient(at 51% 4%, hsla(12,100%,72%,1) 0px, transparent 50%) border-box,
+    linear-gradient(#c299ff 0 100%) border-box;
+  
+  opacity: calc((var(--pointer-d) - var(--color-sens)) / (100 - var(--color-sens)));
+  
+  mask-image: 
+    conic-gradient( 
+      from var(--pointer-°) at center, black 25%, transparent 40%, transparent 60%, black 75%
+    );
+}
+
+.glow-card::after {
+  border: 1px solid transparent;
+  
+  background:
+    radial-gradient(at 80% 55%, hsla(268,100%,76%,1) 0px, transparent 50%) padding-box,
+    radial-gradient(at 69% 34%, hsla(349,100%,74%,1) 0px, transparent 50%) padding-box,
+    radial-gradient(at 8% 6%, hsla(136,100%,78%,1) 0px, transparent 50%) padding-box,
+    radial-gradient(at 41% 38%, hsla(192,100%,64%,1) 0px, transparent 50%) padding-box,
+    radial-gradient(at 86% 85%, hsla(186,100%,74%,1) 0px, transparent 50%) padding-box,
+    radial-gradient(at 82% 18%, hsla(52,100%,65%,1) 0px, transparent 50%) padding-box,
+    radial-gradient(at 51% 4%, hsla(12,100%,72%,1) 0px, transparent 50%) padding-box,
+    linear-gradient(#c299ff 0 100%) padding-box;
+  
+  mask-image:
+    linear-gradient( to bottom, black, black ),
+    radial-gradient( ellipse at 50% 50%, black 40%, transparent 65% ),
+    radial-gradient( ellipse at 66% 66%, black 5%, transparent 40% ),
+    radial-gradient( ellipse at 33% 33%, black 5%, transparent 40% ),
+    radial-gradient( ellipse at 66% 33%, black 5%, transparent 40% ),
+    radial-gradient( ellipse at 33% 66%, black 5%, transparent 40% ),
+    conic-gradient( from var(--pointer-°) at center, transparent 5%, black 15%, black 85%, transparent 95% );
+
+  mask-composite: subtract,add,add,add,add,add;
+  
+  opacity: calc((var(--pointer-d) - var(--color-sens)) / (100 - var(--color-sens)));
+  mix-blend-mode: var(--blend);
+}
+
+.glow-card > .glow {
+  --outset: var(--pads);
+  
+  inset: calc(var(--outset) * -1);
+  pointer-events: none;
+  z-index: 1;
+  
+  mask-image: 
+    conic-gradient( 
+      from var(--pointer-°) at center, black 2.5%, transparent 10%, transparent 90%, black 97.5%
+    );
+  
+  opacity: calc((var(--pointer-d) - var(--glow-sens)) / (100 - var(--glow-sens)));
+  mix-blend-mode: var(--glow-blend);
+}
+
+.glow-card > .glow::before {
+  content: "";
+  position: absolute;
+  inset: var(--outset);
+  border-radius: inherit;
+  box-shadow: 
+    inset 0 0 0 1px hsl( var(--glow-color) / 100%),
+    inset 0 0 2px 2px hsl( var(--glow-color) / 90%),
+    inset 0 0 5px 1px hsl( var(--glow-color) / 75%),
+    inset 0 0 8px 1px hsl( var(--glow-color) / 66%),
+    inset 0 0 15px 0 hsl( var(--glow-color) / 50%),
+    inset 0 0 25px 2px hsl( var(--glow-color) / 30%),
+    inset 0 0 50px 2px hsl( var(--glow-color) / 10%),
+
+    0 0 2px 2px hsl( var(--glow-color) / 90%),
+    0 0 5px 1px hsl( var(--glow-color) / 75%),
+    0 0 8px 1px hsl( var(--glow-color) / 66%),
+    0 0 15px 0 hsl( var(--glow-color) / 50%),
+    0 0 25px 2px hsl( var(--glow-color) / 30%),
+    0 0 50px 2px hsl( var(--glow-color) / 10%);
+}
+
+.glow-card .inner {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  container-type: inline-size;
+  position: relative;
+  overflow: auto;
+  z-index: 1;
+  text-align: center;
+}
+
+.glow-card .inner h2 {
+  color: inherit;
+  font-weight: 500;
+  font-size: 1.25em;
+  margin-block: 0.5em;
+}
+
+.glow-card .inner header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5em 1em;
+}
+
+.glow-card .inner svg {
+  height: 24px;
+}
+
+.glow-card .content {
+  padding: 1em;
+  font-weight: 300;
+  text-align: left;
+  line-height: 1.4;
+  color: color-mix(var(--fg), transparent 60%);
+  overflow: hidden;
+  scrollbar-width: none;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  position: relative;
+  border-radius: 1.768em; /* Match the card's border radius */
+}
+
+/* New chat layout styles */
+.messages-container {
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  margin-bottom: 1rem;
+  min-height: 0; /* Important for flex child */
+  padding-bottom: 120px; /* Account for input container height */
+  position: relative;
+  border-radius: 1.768em; /* Match the card's border radius */
+  /* Ensure smooth scrolling */
+  scroll-behavior: smooth;
+  /* Force scroll to bottom */
+  display: flex;
+  flex-direction: column;
+}
+
+.messages-container::-webkit-scrollbar {
+  display: none;
+}
+
+.messages-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding-bottom: 0.5rem;
+  /* Ensure the list takes full height */
+  flex: 1;
+  /* Force content to bottom */
+  justify-content: flex-end;
+  min-height: 100%;
+}
+
+.input-container {
+  flex-shrink: 0;
+  margin-top: auto;
+  padding-top: 1rem;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  background: transparent;
+  border-radius: 0 0 1.768em 1.768em; /* Match the card's border radius */
+  padding-bottom: 1rem;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .messages-container {
+    margin-bottom: 0.5rem;
+    padding-bottom: 100px; /* Slightly less padding on mobile */
+  }
+  
+  .input-container {
+    padding-top: 0.5rem;
+  }
+  
+  .cyberpunk-form {
+    padding: 15px;
+  }
+}
+
+@media (max-height: 600px) {
+  .messages-container {
+    max-height: 50vh;
+    padding-bottom: 80px; /* Less padding on short screens */
+  }
+  
+  .input-container {
+    padding-top: 0.25rem;
+  }
+}
+
+/* Ensure the content area takes full height */
+.glow-card .inner {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  container-type: inline-size;
+  position: relative;
+  overflow: hidden;
+  z-index: 1;
+  text-align: center;
+  border-radius: 1.768em; /* Match the card's border radius */
+}
+
+.glow-card .content em,
+.glow-card .content strong {
+  color: color-mix(var(--fg), transparent 40%);
+}
+
+.glow-card .content p {
+  opacity: 0;
+  animation: fadeContent 0.3s ease-in-out 0.1s both;
+}
+
+.glow-card .content p:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.glow-card .content p:nth-child(3) {
+  animation-delay: 0.2s;
+}
+
+.glow-card .content p:nth-child(4) {
+  animation-delay: 0.25s;
+}
+
+@keyframes fadeContent {
+  to {
+    opacity: 1;
+  }
+}
+
+.sun {
+  opacity: 0.25;
+  transition: all 0.2s ease;
+}
+
+.sun:hover {
+  opacity: 1;
+}
+
+.moon {
+  opacity: 1;
+  transition: all 0.2s ease;
+}
+
+.light .sun {
+  opacity: 1;
+}
+
+.light .moon {
+  opacity: 0.25;
+}
+
+.light .moon:hover {
+  opacity: 1;
+}
+
+.light h2 {
+  text-shadow: 0 1px 1px lightslategray;
+}
+
+/* Light mode background */
+body.light {
+  background-image: 
+    linear-gradient( 
+      180deg, 
+      hsl(var(--h), 8%, 58%), 
+      hsl(var(--h), 15%, 42%) 
+    );
+}
+
+/* Chat interface link styles */
+.glow-card .content a {
+  text-decoration: underline;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.glow-card .content a:hover {
+  text-decoration-thickness: 2px;
+}
+
+/* Ensure links are visible in both themes */
+.glow-card .content a:not(.inline-flex) {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.light .glow-card .content a:not(.inline-flex) {
+  color: #2563eb;
+}
+
+.light .glow-card .content a:not(.inline-flex):hover {
+  color: #1d4ed8;
+}
+
+/* Dark mode link styling */
+.glow-card .content a:not(.inline-flex) {
+  color: #60a5fa;
+}
+
+.glow-card .content a:not(.inline-flex):hover {
+  color: #93c5fd;
+}
+
+/* Ensure external link icons are visible */
+.glow-card .content a svg {
+  opacity: 0.8;
+  transition: opacity 0.2s ease;
+}
+
+.glow-card .content a:hover svg {
+  opacity: 1;
+}
+
+/* Retro Cyberpunk Input Form */
+.cyberpunk-form {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  display: block;
+  font-size: 0px;
+  padding: 20px;
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  margin-top: 20px;
+  border-radius: 0 0 1.768em 1.768em; /* Match the card's border radius */
+}
+
+.cyberpunk-form::before,
+.cyberpunk-form::after {
+  display: none;
+}
+
+.cyberpunk-input {
+  background: #222;	
+  background: linear-gradient(#333, #222);	
+  border: 1px solid #444;
+  border-radius: 5px 0 0 5px;
+  box-shadow: 0 2px 0 #000;
+  color: #888;
+  display: block;
+  float: left;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 400;
+  height: 40px;
+  margin: 0;
+  padding: 0 10px;
+  text-shadow: 0 -1px 0 #000;
+  width: calc(100% - 80px);
+  outline: none;
+  position: relative;
+  z-index: 1;
+}
+
+.cyberpunk-input::-webkit-input-placeholder {
+  color: #888;
+}
+
+.cyberpunk-input:-moz-placeholder {
+  color: #888;
+}
+
+.cyberpunk-input:hover {
+  background: #222922;
+  background: linear-gradient(#333933, #222922);
+  border-color: #3b82f6;
+  box-shadow: 0 0 3px rgba(59, 130, 246, 0.15), inset 0 0 3px rgba(59, 130, 246, 0.05), 0 2px 0 #000;
+  color: #efe;
+  transition: all 0.2s ease;
+}
+
+.cyberpunk-input:focus {
+  animation: cyberpunk-glow 800ms ease-out infinite alternate;
+  background: #222922;
+  background: linear-gradient(#333933, #222922);
+  border-color: #3b82f6;
+  box-shadow: 0 0 5px rgba(59, 130, 246, 0.2), inset 0 0 5px rgba(59, 130, 246, 0.1), 0 2px 0 #000;
+  color: #efe;
+  outline: none;
+}
+
+.cyberpunk-input:focus::-webkit-input-placeholder { 
+  color: #efe;
+}
+
+.cyberpunk-input:focus:-moz-placeholder {
+  color: #efe;
+}
+
+.cyberpunk-button {
+  background: #222;
+  background: linear-gradient(#333, #222);
+  box-sizing: border-box;
+  border: 1px solid #444;
+  border-left-color: #000;
+  border-radius: 0 5px 5px 0;
+  box-shadow: 0 2px 0 #000;
+  color: #fff;
+  display: block;
+  float: left;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 400;
+  height: 40px;
+  line-height: 40px;
+  margin: 0;
+  padding: 0;
+  position: relative;
+  text-shadow: 0 -1px 0 #000;
+  width: 80px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 1;
+}	
+
+.cyberpunk-button:hover,
+.cyberpunk-button:focus {
+  background: #292929;
+  background: linear-gradient(#393939, #292929);
+  color: #5f5;
+  outline: none;
+}
+
+.cyberpunk-button:active {
+  background: #292929;
+  background: linear-gradient(#393939, #292929);
+  box-shadow: 0 1px 0 #000, inset 1px 0 1px #222;
+  top: 1px;
+}
+
+.cyberpunk-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Light mode styling for cyberpunk form */
+.light .cyberpunk-input {
+  background: #f8f9fa;
+  background: linear-gradient(#ffffff, #f8f9fa);
+  border: 1px solid #dee2e6;
+  color: #495057;
+  text-shadow: none;
+  box-shadow: 0 2px 0 #e9ecef;
+}
+
+.light .cyberpunk-input::-webkit-input-placeholder {
+  color: #6c757d;
+}
+
+.light .cyberpunk-input:-moz-placeholder {
+  color: #6c757d;
+}
+
+.light .cyberpunk-input:hover {
+  background: #e3f2fd;
+  background: linear-gradient(#f3f9ff, #e3f2fd);
+  border-color: #3b82f6;
+  color: #1a202c;
+  box-shadow: 0 0 3px rgba(59, 130, 246, 0.15), inset 0 0 3px rgba(59, 130, 246, 0.05), 0 2px 0 #e9ecef;
+  transition: all 0.2s ease;
+}
+
+.light .cyberpunk-input:focus {
+  background: #e3f2fd;
+  background: linear-gradient(#f3f9ff, #e3f2fd);
+  border-color: #3b82f6;
+  color: #1a202c;
+  box-shadow: 0 0 5px rgba(59, 130, 246, 0.2), inset 0 0 5px rgba(59, 130, 246, 0.1), 0 2px 0 #e9ecef;
+}
+
+.light .cyberpunk-input:focus::-webkit-input-placeholder {
+  color: #1a202c;
+}
+
+.light .cyberpunk-input:focus:-moz-placeholder {
+  color: #1a202c;
+}
+
+.light .cyberpunk-button {
+  background: #f8f9fa;
+  background: linear-gradient(#ffffff, #f8f9fa);
+  border: 1px solid #dee2e6;
+  border-left-color: #adb5bd;
+  color: #495057;
+  text-shadow: none;
+  box-shadow: 0 2px 0 #e9ecef;
+}
+
+.light .cyberpunk-button:hover,
+.light .cyberpunk-button:focus {
+  background: #e9ecef;
+  background: linear-gradient(#f8f9fa, #e9ecef);
+  color: #3b82f6;
+}
+
+.light .cyberpunk-button:active {
+  background: #e9ecef;
+  background: linear-gradient(#f8f9fa, #e9ecef);
+  box-shadow: 0 1px 0 #e9ecef, inset 1px 0 1px #dee2e6;
+  top: 1px;
+}
+
+@keyframes cyberpunk-glow {
+  0% {
+    border-color: #3b82f6;
+    box-shadow: 0 0 5px rgba(59, 130, 246, 0.2), inset 0 0 5px rgba(59, 130, 246, 0.1), 0 2px 0 #000;
+  }	
+  100% {
+    border-color: #60a5fa;
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.6), inset 0 0 10px rgba(59, 130, 246, 0.4), 0 2px 0 #000;
+  }
+}
+
+.light .cyberpunk-input:focus {
+  animation: cyberpunk-glow-light 800ms ease-out infinite alternate;
+}
+
+@keyframes cyberpunk-glow-light {
+  0% {
+    border-color: #3b82f6;
+    box-shadow: 0 0 5px rgba(59, 130, 246, 0.2), inset 0 0 5px rgba(59, 130, 246, 0.1), 0 2px 0 #e9ecef;
+  }	
+  100% {
+    border-color: #60a5fa;
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.6), inset 0 0 10px rgba(59, 130, 246, 0.4), 0 2px 0 #e9ecef;
+  }
+} 
+
+/* Illuminated Glow Text Effect */
+.glow-text-filters {
+  position: absolute;
+  width: 0;
+  height: 0;
+  z-index: -1;
+}
+
+.glow-text {
+  position: relative;
+  display: inline-block;
+  scale: 1;
+  animation: onloadscale 1s ease-out forwards;
+}
+
+.glow-text::before {
+  content: attr(data-text);
+  position: absolute;
+  pointer-events: none;
+  color: #fffaf6;
+  background: linear-gradient(0deg, #dfe5ee 0%, #fffaf6 50%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: url(#glow-4);
+  -moz-filter: url(#glow-4);
+  -webkit-filter: url(#glow-4);
+  opacity: 0;
+  animation: onloadopacity 1s ease-out forwards;
+}
+
+@keyframes onloadscale {
+  24% { scale: 1; }
+  100% { scale: 1.02; }
+}
+
+@keyframes onloadopacity {
+  24% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+/* Light mode adjustments for glow text */
+.light .glow-text::before {
+  background: linear-gradient(0deg, #1a202c 0%, #2d3748 50%);
+  color: #2d3748;
+} 

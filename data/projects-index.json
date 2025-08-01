@@ -1,0 +1,46 @@
+{
+  "projects": [
+    {
+      "id": "twisted-pin",
+      "title": "Twisted Pin – A Brand Rooted in Play",
+      "tags": ["gamification", "bowling", "arcade", "UX", "interactive signage", "brand experience"],
+      "link": "https://www.clubhausagency.com/projects/1dPUCr9sz1VSwX64msaksd",
+      "source": "twisted-pin.md",
+      "category": "branding",
+      "client_type": "entertainment",
+      "key_techniques": ["gamification", "interactive design", "HUD graphics", "playful UX"]
+    },
+    {
+      "id": "x-games-skate-deck",
+      "title": "X Games – Heart of the City Skate Deck",
+      "tags": ["x games", "us bank stadium", "skate deck design", "event branding", "minneapolis", "streetwear", "civic pride", "high-profile work", "extreme sports", "limited edition"],
+      "link": "https://www.clubhausagency.com/projects/6ewjcux7rRgS2LUYEIXS1O",
+      "source": "x-games-skate-deck.md",
+      "category": "branding",
+      "client_type": "events",
+      "key_techniques": ["limited edition design", "event branding", "merchandise design", "civic pride", "high-profile collaboration"]
+    },
+    {
+      "id": "blasted-ink",
+      "title": "Blasted Ink – Custom Tattoo Shop Branding",
+      "tags": ["tattoo shop", "mall of america", "hand-drawn typography", "custom lettering", "brand identity", "bold design", "visual storytelling", "street culture", "art-driven branding", "letterform design"],
+      "link": "https://www.clubhausagency.com/projects/OOXhZty5Ueo1QMC9kmD9I",
+      "source": "blasted-ink.md",
+      "category": "branding",
+      "client_type": "retail",
+      "key_techniques": ["hand-drawn typography", "custom lettering", "art-driven branding", "bold visual identity"]
+    }
+  ],
+  "categories": {
+    "branding": "Complete brand identity and experience design",
+    "web": "Website design and development",
+    "ai": "AI-powered tools and experiences",
+    "print": "Print and packaging design"
+  },
+  "client_types": {
+    "entertainment": "Bars, restaurants, venues, entertainment spaces",
+    "retail": "Product brands, retail spaces, e-commerce",
+    "events": "Event branding and marketing",
+    "tech": "Technology companies and startups"
+  }
+} 
