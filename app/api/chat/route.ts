@@ -91,7 +91,7 @@ export async function POST(req: Request) {
     console.log('🔑 GROQ_API_KEY starts with:', process.env.GROQ_API_KEY?.substring(0, 10))
     
     // Parse the request body
-    const { messages } = await req.json()
+    const { messages, sessionId: providedSessionId } = await req.json()
 
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
       console.log('❌ No messages provided')
@@ -116,7 +116,7 @@ export async function POST(req: Request) {
     // Initialize simple logger for chat logging
     const logger = SimpleLogger.getInstance()
     const userId = 'anonymous' // In a real app, this would come from authentication
-    const sessionId = `session_${Date.now()}`
+    const sessionId = providedSessionId || `session_${Date.now()}`
     
     // Log the user message
     await logger.logUserMessage(userId, lastMessage.content, {
