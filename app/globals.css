@@ -466,6 +466,12 @@
   /* Better spacing for mobile */
   .glow-card .inner header {
     padding: 0px 10px 0px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: hsl(var(--h), 18%, 12%);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   }
   
   .glow-card .inner h2 {
@@ -484,6 +490,12 @@
   /* Better mobile spacing */
   .glow-card .content {
     padding: 10px 15px;
+  }
+  
+  /* Light mode sticky header */
+  .light .glow-card .inner header {
+    background: hsl(260, 25%, 95%);
+    border-bottom: 1px solid rgba(59, 130, 246, 0.1);
   }
 }
 
