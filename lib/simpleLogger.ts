@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'path'
+import DatabaseLogger from './databaseLogger'
 
 export interface ChatLog {
   id: string
@@ -17,6 +18,7 @@ export class SimpleLogger {
   private logFile: string
   private isVercel: boolean
   private inMemoryLogs: ChatLog[] = []
+  private databaseLogger: DatabaseLogger | null = null
 
   private constructor() {
     this.isVercel = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production'
@@ -25,6 +27,9 @@ export class SimpleLogger {
     
     if (!this.isVercel) {
       this.ensureLogDirectory()
+    } else {
+      // Initialize database logger for Vercel
+      this.databaseLogger = DatabaseLogger.getInstance()
     }
   }
 
@@ -42,9 +47,9 @@ export class SimpleLogger {
   }
 
   private readLogs(): ChatLog[] {
-    // On Vercel, use in-memory storage
+    // On Vercel, use database storage
     if (this.isVercel) {
-      return this.inMemoryLogs
+      return this.inMemoryLogs // This will be empty, but we'll use database for actual storage
     }
     
     // On local, read from file
@@ -61,7 +66,7 @@ export class SimpleLogger {
   }
 
   private writeLogs(logs: ChatLog[]): void {
-    // On Vercel, store in memory
+    // On Vercel, store in memory (but we'll use database for actual storage)
     if (this.isVercel) {
       this.inMemoryLogs = logs
       return
@@ -83,6 +88,13 @@ export class SimpleLogger {
     message: string,
     metadata: Record<string, any> = {}
   ): Promise<void> {
+    if (this.isVercel && this.databaseLogger) {
+      // Use database logger on Vercel
+      await this.databaseLogger.logUserMessage(userId, message, metadata)
+      return
+    }
+
+    // Use file system on local
     const sessionId = metadata.sessionId || `session_${Date.now()}`
     
     const logEntry: ChatLog = {
@@ -103,7 +115,7 @@ export class SimpleLogger {
     logs.push(logEntry)
     this.writeLogs(logs)
 
-    console.log('📝 Logged user message for user:', userId, this.isVercel ? '(Vercel - in-memory)' : '(Local - file)')
+    console.log('📝 Logged user message for user:', userId, this.isVercel ? '(Database)' : '(Local - file)')
   }
 
   /**
@@ -114,6 +126,13 @@ export class SimpleLogger {
     response: string,
     metadata: Record<string, any> = {}
   ): Promise<void> {
+    if (this.isVercel && this.databaseLogger) {
+      // Use database logger on Vercel
+      await this.databaseLogger.logAIResponse(userId, response, metadata)
+      return
+    }
+
+    // Use file system on local
     const sessionId = metadata.sessionId || `session_${Date.now()}`
     
     const logEntry: ChatLog = {
@@ -134,13 +153,19 @@ export class SimpleLogger {
     logs.push(logEntry)
     this.writeLogs(logs)
 
-    console.log('🤖 Logged AI response for user:', userId, this.isVercel ? '(Vercel - in-memory)' : '(Local - file)')
+    console.log('🤖 Logged AI response for user:', userId, this.isVercel ? '(Database)' : '(Local - file)')
   }
 
   /**
    * Get all chat logs for a user
    */
   async getAllChatLogs(userId: string): Promise<ChatLog[]> {
+    if (this.isVercel && this.databaseLogger) {
+      // Use database logger on Vercel
+      return await this.databaseLogger.getAllChatLogs(userId)
+    }
+
+    // Use file system on local
     const logs = this.readLogs()
     return logs.filter(log => log.userId === userId)
   }
@@ -149,6 +174,12 @@ export class SimpleLogger {
    * Get all chat logs
    */
   async getAllLogs(): Promise<ChatLog[]> {
+    if (this.isVercel && this.databaseLogger) {
+      // Use database logger on Vercel
+      return await this.databaseLogger.getAllLogs()
+    }
+
+    // Use file system on local
     return this.readLogs()
   }
 
@@ -156,6 +187,12 @@ export class SimpleLogger {
    * Get chat logs by session
    */
   async getLogsBySession(sessionId: string): Promise<ChatLog[]> {
+    if (this.isVercel && this.databaseLogger) {
+      // Use database logger on Vercel
+      return await this.databaseLogger.getLogsBySession(sessionId)
+    }
+
+    // Use file system on local
     const logs = this.readLogs()
     return logs.filter(log => log.sessionId === sessionId)
   }
@@ -164,6 +201,13 @@ export class SimpleLogger {
    * Delete all chat logs for a user
    */
   async deleteAllChatLogs(userId: string): Promise<void> {
+    if (this.isVercel && this.databaseLogger) {
+      // Use database logger on Vercel
+      await this.databaseLogger.deleteAllChatLogs(userId)
+      return
+    }
+
+    // Use file system on local
     const logs = this.readLogs()
     const filteredLogs = logs.filter(log => log.userId !== userId)
     this.writeLogs(filteredLogs)
@@ -174,6 +218,13 @@ export class SimpleLogger {
    * Reset all chat logs (use with caution)
    */
   async resetAllChatLogs(): Promise<void> {
+    if (this.isVercel && this.databaseLogger) {
+      // Use database logger on Vercel
+      await this.databaseLogger.resetAllChatLogs()
+      return
+    }
+
+    // Use file system on local
     this.writeLogs([])
     console.log('🔄 Reset all chat logs')
   }
@@ -202,6 +253,12 @@ export class SimpleLogger {
     totalSessions: number
     userStats: Record<string, number>
   }> {
+    if (this.isVercel && this.databaseLogger) {
+      // Use database logger on Vercel
+      return await this.databaseLogger.getStats()
+    }
+
+    // Use file system on local
     const logs = this.readLogs()
     const users = new Set(logs.map(log => log.userId))
     const sessions = new Set(logs.map(log => log.sessionId))
@@ -225,8 +282,18 @@ export class SimpleLogger {
   getEnvironmentInfo(): { isVercel: boolean; storageType: string } {
     return {
       isVercel: this.isVercel,
-      storageType: this.isVercel ? 'in-memory' : 'file-system'
+      storageType: this.isVercel ? 'database' : 'file-system'
     }
+  }
+
+  /**
+   * Test database connection (Vercel only)
+   */
+  async testDatabaseConnection(): Promise<boolean> {
+    if (this.isVercel && this.databaseLogger) {
+      return await this.databaseLogger.testConnection()
+    }
+    return true // Local doesn't need database
   }
 }
 

@@ -10,14 +10,21 @@ export async function GET(req: NextRequest) {
     const chatLogs = await logger.getAllChatLogs(userId)
     const envInfo = logger.getEnvironmentInfo()
     
+    // Test database connection on Vercel
+    let dbConnectionStatus = null
+    if (envInfo.isVercel) {
+      dbConnectionStatus = await logger.testDatabaseConnection()
+    }
+    
     return new Response(
       JSON.stringify({ 
         chatLogs,
         count: chatLogs.length,
         userId,
         environment: envInfo,
+        dbConnectionStatus,
         message: envInfo.isVercel 
-          ? 'Logs are stored in-memory on Vercel and will reset between deployments' 
+          ? 'Logs are stored in database on Vercel and persist between deployments' 
           : 'Logs are stored in local file system'
       }),
       { 

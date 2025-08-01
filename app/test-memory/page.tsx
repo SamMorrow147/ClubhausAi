@@ -32,6 +32,7 @@ interface ApiResponse {
   count: number
   userId: string
   environment: EnvironmentInfo
+  dbConnectionStatus?: boolean
   message: string
 }
 
@@ -43,6 +44,7 @@ export default function TestMemoryPage() {
   const [error, setError] = useState<string | null>(null)
   const [environmentInfo, setEnvironmentInfo] = useState<EnvironmentInfo | null>(null)
   const [environmentMessage, setEnvironmentMessage] = useState<string>('')
+  const [dbConnectionStatus, setDbConnectionStatus] = useState<boolean | null>(null)
 
   const fetchChatLogs = async () => {
     setLoading(true)
@@ -57,6 +59,7 @@ export default function TestMemoryPage() {
       setChatLogs(logs)
       setEnvironmentInfo(data.environment)
       setEnvironmentMessage(data.message)
+      setDbConnectionStatus(data.dbConnectionStatus ?? null)
       
       // Group logs by session
       const sessionMap = new Map<string, ChatLog[]>()
@@ -149,10 +152,21 @@ export default function TestMemoryPage() {
             </div>
             <p className="text-sm opacity-90">{environmentMessage}</p>
             {environmentInfo.isVercel && (
-              <p className="text-sm opacity-75 mt-2">
-                💡 <strong>Note:</strong> On Vercel, logs are stored in-memory and will reset between deployments. 
-                For persistent logging, consider using a database service.
-              </p>
+              <div className="text-sm opacity-75 mt-2">
+                {dbConnectionStatus === true ? (
+                  <p className="text-green-300">
+                    ✅ <strong>Database Connected:</strong> Logs are being stored persistently in the database.
+                  </p>
+                ) : dbConnectionStatus === false ? (
+                  <p className="text-red-300">
+                    ❌ <strong>Database Connection Failed:</strong> Logs may not be persisting. Check Vercel KV configuration.
+                  </p>
+                ) : (
+                  <p>
+                    🔄 <strong>Checking Database Connection...</strong>
+                  </p>
+                )}
+              </div>
             )}
           </div>
         )}
