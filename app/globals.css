@@ -85,6 +85,21 @@
     height: 100svh;
     overflow: auto;
     background: hsl(var(--h), 18%, 12%);
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  /* Allow text selection in input fields */
+  input, textarea {
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+    user-select: text;
   }
 }
 
@@ -318,7 +333,7 @@
 @media (max-width: 768px) {
   .messages-container {
     margin-bottom: 0.5rem;
-    padding-bottom: 100px; /* Slightly less padding on mobile */
+    padding-bottom: 120px; /* More padding for mobile input */
   }
   
   .input-container {
@@ -349,6 +364,48 @@
   
   .glow-card .inner {
     border-radius: 0;
+  }
+  
+  /* Mobile-specific input improvements */
+  .cyberpunk-input {
+    height: 50px !important; /* Larger touch target */
+    padding: 0 15px !important;
+    border-radius: 8px 0 0 8px !important;
+  }
+  
+  .cyberpunk-button {
+    height: 50px !important; /* Match input height */
+    width: 60px !important; /* Larger touch target */
+    border-radius: 0 8px 8px 0 !important;
+  }
+  
+  /* Improve touch targets for buttons */
+  .cyberpunk-button svg {
+    width: 20px !important;
+    height: 20px !important;
+  }
+  
+  /* Better spacing for mobile */
+  .glow-card .inner header {
+    padding: 15px 20px 10px 20px;
+  }
+  
+  .glow-card .inner h2 {
+    font-size: 1.5rem;
+  }
+  
+  /* Improve message bubbles for mobile */
+  .messages-list .flex {
+    margin-bottom: 12px;
+  }
+  
+  .messages-list .max-w-xs {
+    max-width: 85% !important;
+  }
+  
+  /* Better mobile spacing */
+  .glow-card .content {
+    padding: 10px 15px;
   }
 }
 
