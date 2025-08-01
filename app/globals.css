@@ -85,6 +85,8 @@
     height: 100vh;
     height: 100dvh;
     overflow: hidden;
+    position: fixed;
+    width: 100%;
     background: hsl(var(--h), 18%, 12%);
     -webkit-touch-callout: none;
     -webkit-user-select: none;
@@ -350,6 +352,40 @@
     z-index: 20;
     background: hsl(var(--h), 18%, 12%);
     padding-bottom: env(safe-area-inset-bottom);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  
+  /* Prevent scrolling when keyboard is open */
+  .glow-card .inner {
+    height: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .glow-card .content {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .messages-container {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    max-height: calc(100vh - 200px); /* Ensure it doesn't exceed viewport */
+    max-height: calc(100dvh - 200px);
+  }
+  
+  /* Ensure the powered by text stays at bottom */
+  .cyberpunk-form p {
+    margin: 0;
+    padding: 8px 0;
+    text-align: center;
+    font-size: 11px;
+    opacity: 0.5;
   }
   
   .cyberpunk-form {
