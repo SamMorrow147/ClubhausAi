@@ -327,6 +327,14 @@
   padding-right: 1rem;
 }
 
+/* Desktop height adjustment */
+@media (min-width: 769px) {
+  .glow-card {
+    height: 80vh;
+    max-height: 80vh;
+  }
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   /* Prevent body from scrolling on mobile */
