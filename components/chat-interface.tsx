@@ -412,11 +412,11 @@ export function ChatInterface() {
                       className="w-full h-full object-contain"
                     />
                   </div>
-                  <h3 className={`text-lg font-medium mb-2 ${isLightMode ? 'text-blue-900' : 'text-white'}`}>Clubman</h3>
+
                   <p className={`mb-6 ${isLightMode ? 'text-blue-900/80' : 'text-white/80'}`}>
                     A Clubhaus AI built to talk with you about your project or our business. Whether you're here to build something bold or just exploring, I'm here to help.
                   </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg mx-auto">
+                  <div className="hidden md:grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg mx-auto">
                     {quickQuestions.map((question, index) => (
                       <Button
                         key={index}

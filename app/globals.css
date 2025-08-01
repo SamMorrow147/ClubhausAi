@@ -323,10 +323,32 @@
   
   .input-container {
     padding-top: 0.5rem;
+    padding-left: 0;
+    padding-right: 0;
+    margin-left: 0;
+    margin-right: 0;
   }
   
   .cyberpunk-form {
-    padding: 15px;
+    padding: 0;
+    margin: 0;
+  }
+  
+  .cyberpunk-form form {
+    margin: 0;
+    padding: 0;
+  }
+  
+  .glow-card {
+    --pads: 0px;
+    width: 100vw;
+    height: 100vh;
+    max-height: none;
+    border-radius: 0;
+  }
+  
+  .glow-card .inner {
+    border-radius: 0;
   }
 }
 
