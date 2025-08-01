@@ -255,7 +255,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.5em 1em;
+  padding: 0px 10px 0px;
 }
 
 .glow-card .inner svg {
@@ -457,7 +457,7 @@
   
   /* Better spacing for mobile */
   .glow-card .inner header {
-    padding: 15px 20px 10px 20px;
+    padding: 0px 10px 0px;
   }
   
   .glow-card .inner h2 {
