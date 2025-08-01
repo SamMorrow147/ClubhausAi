@@ -71,6 +71,18 @@ interface ApiResponse {
   message: string
 }
 
+interface DebugInfo {
+  requestId: string
+  errorType: string
+  errorMessage?: string
+  errorName?: string
+  totalTime?: number
+  timestamp?: string
+  responseType?: string
+  responseTime?: number
+  groqResponseTime?: number
+}
+
 export default function TestMemoryPage() {
   const [chatLogs, setChatLogs] = useState<ChatLog[]>([])
   const [sessions, setSessions] = useState<ConversationSession[]>([])
@@ -83,6 +95,12 @@ export default function TestMemoryPage() {
   const [tokenUsageData, setTokenUsageData] = useState<TokenUsageData | null>(null)
   const [tokenUsageLoading, setTokenUsageLoading] = useState(false)
   const [tokenUsageError, setTokenUsageError] = useState<string | null>(null)
+  const [debugInfo, setDebugInfo] = useState<DebugInfo[]>([])
+  const [testMessage, setTestMessage] = useState('')
+  const [testLoading, setTestLoading] = useState(false)
+  const [testResult, setTestResult] = useState<any>(null)
+  const [systemStatus, setSystemStatus] = useState<any>(null)
+  const [systemStatusLoading, setSystemStatusLoading] = useState(false)
 
   const fetchTokenUsage = async () => {
     setTokenUsageLoading(true)
@@ -115,6 +133,61 @@ export default function TestMemoryPage() {
       setTokenUsageError(err instanceof Error ? err.message : 'Failed to reset token usage data')
     } finally {
       setTokenUsageLoading(false)
+    }
+  }
+
+  const testChatAPI = async () => {
+    if (!testMessage.trim()) return
+    
+    setTestLoading(true)
+    setTestResult(null)
+    
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: testMessage }],
+          sessionId: `test_${Date.now()}`
+        }),
+      })
+
+      const data = await response.json()
+      setTestResult(data)
+      
+      // If there's debug info, add it to our debug list
+      if (data.debug) {
+        setDebugInfo(prev => [data.debug, ...prev.slice(0, 9)]) // Keep last 10
+      }
+      
+    } catch (err) {
+      setTestResult({ error: err instanceof Error ? err.message : 'Unknown error' })
+    } finally {
+      setTestLoading(false)
+    }
+  }
+
+  const clearDebugInfo = () => {
+    setDebugInfo([])
+    setTestResult(null)
+  }
+
+  const fetchSystemStatus = async () => {
+    setSystemStatusLoading(true)
+    try {
+      const response = await fetch('/api/test')
+      if (!response.ok) {
+        throw new Error('Failed to fetch system status')
+      }
+      const data = await response.json()
+      setSystemStatus(data)
+    } catch (err) {
+      console.error('Failed to fetch system status:', err)
+      setSystemStatus({ error: err instanceof Error ? err.message : 'Unknown error' })
+    } finally {
+      setSystemStatusLoading(false)
     }
   }
 
@@ -213,6 +286,7 @@ export default function TestMemoryPage() {
   useEffect(() => {
     fetchChatLogs()
     fetchTokenUsage()
+    fetchSystemStatus() // Fetch system status on mount
   }, [])
 
   return (
@@ -269,6 +343,239 @@ export default function TestMemoryPage() {
           <button onClick={resetTokenUsage} disabled={tokenUsageLoading} className="bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 px-4 py-2 rounded">
             {tokenUsageLoading ? 'Resetting...' : 'Reset Token Data'}
           </button>
+        </div>
+
+        {/* Debug Panel */}
+        <div className="bg-gray-800 rounded-lg p-6 mb-6">
+          <h2 className="text-xl font-semibold mb-4 flex items-center">
+            🐛 Debug Panel
+          </h2>
+          
+          {/* Test Chat API */}
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold mb-3 text-blue-400">Test Chat API</h3>
+            <div className="flex space-x-2 mb-4">
+              <input
+                type="text"
+                value={testMessage}
+                onChange={(e) => setTestMessage(e.target.value)}
+                placeholder="Enter a test message..."
+                className="flex-1 bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
+              />
+              <button 
+                onClick={testChatAPI} 
+                disabled={testLoading || !testMessage.trim()}
+                className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 px-4 py-2 rounded"
+              >
+                {testLoading ? 'Testing...' : 'Test'}
+              </button>
+              <button 
+                onClick={clearDebugInfo}
+                className="bg-gray-600 hover:bg-gray-700 px-4 py-2 rounded"
+              >
+                Clear
+              </button>
+            </div>
+            
+            {testResult && (
+              <div className="bg-gray-700 rounded p-4 mb-4">
+                <h4 className="font-semibold mb-2">Test Result:</h4>
+                <pre className="text-xs bg-gray-800 p-2 rounded overflow-x-auto">
+                  {JSON.stringify(testResult, null, 2)}
+                </pre>
+              </div>
+            )}
+          </div>
+
+          {/* Recent Debug Info */}
+          <div>
+            <h3 className="text-lg font-semibold mb-3 text-blue-400">Recent Debug Info ({debugInfo.length})</h3>
+            {debugInfo.length === 0 ? (
+              <p className="text-gray-400 text-sm">No debug information available. Test the chat API to see debug data.</p>
+            ) : (
+              <div className="space-y-2">
+                {debugInfo.map((info, index) => (
+                  <div key={index} className="bg-gray-700 rounded p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center space-x-2">
+                        <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                          info.errorType?.includes('ERROR') 
+                            ? 'bg-red-600 text-red-100' 
+                            : 'bg-green-600 text-green-100'
+                        }`}>
+                          {info.errorType || info.responseType || 'UNKNOWN'}
+                        </span>
+                        <span className="text-xs text-gray-400">
+                          {info.requestId}
+                        </span>
+                      </div>
+                      <span className="text-xs text-gray-400">
+                        {info.timestamp ? new Date(info.timestamp).toLocaleTimeString() : 'N/A'}
+                      </span>
+                    </div>
+                    
+                    {info.errorMessage && (
+                      <div className="text-sm text-red-300 mb-1">
+                        Error: {info.errorMessage}
+                      </div>
+                    )}
+                    
+                    <div className="text-xs text-gray-400 space-x-4">
+                      {info.totalTime && (
+                        <span>Total: {info.totalTime}ms</span>
+                      )}
+                      {info.responseTime && (
+                        <span>Response: {info.responseTime}ms</span>
+                      )}
+                      {info.groqResponseTime && (
+                        <span>Groq: {info.groqResponseTime}ms</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* System Status */}
+        <div className="bg-gray-800 rounded-lg p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold flex items-center">
+              🛠️ System Status
+            </h2>
+            <button 
+              onClick={fetchSystemStatus} 
+              disabled={systemStatusLoading}
+              className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 px-3 py-1 rounded text-sm"
+            >
+              {systemStatusLoading ? 'Refreshing...' : 'Refresh'}
+            </button>
+          </div>
+          
+          {systemStatusLoading ? (
+            <div className="text-center py-8">
+              <p className="text-gray-400">Loading system status...</p>
+            </div>
+          ) : systemStatus ? (
+            <div className="space-y-4">
+              {/* Environment */}
+              <div className="bg-gray-700 rounded-lg p-4">
+                <h3 className="text-lg font-semibold mb-3 text-blue-400">🌍 Environment</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="bg-gray-600 rounded p-3">
+                    <div className="text-sm text-gray-300">Node Env:</div>
+                    <div className="text-lg font-bold text-green-400">
+                      {systemStatus.environment?.NODE_ENV || 'Unknown'}
+                    </div>
+                  </div>
+                  <div className="bg-gray-600 rounded p-3">
+                    <div className="text-sm text-gray-300">Platform:</div>
+                    <div className="text-lg font-bold text-green-400">
+                      {systemStatus.system?.platform || 'Unknown'}
+                    </div>
+                  </div>
+                  <div className="bg-gray-600 rounded p-3">
+                    <div className="text-sm text-gray-300">Node Version:</div>
+                    <div className="text-lg font-bold text-green-400">
+                      {systemStatus.system?.nodeVersion || 'Unknown'}
+                    </div>
+                  </div>
+                  <div className="bg-gray-600 rounded p-3">
+                    <div className="text-sm text-gray-300">Uptime:</div>
+                    <div className="text-lg font-bold text-green-400">
+                      {systemStatus.system?.uptime ? Math.floor(systemStatus.system.uptime / 60) + 'm' : 'Unknown'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* API Keys */}
+              <div className="bg-gray-700 rounded-lg p-4">
+                <h3 className="text-lg font-semibold mb-3 text-blue-400">🔑 API Keys</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-gray-600 rounded p-3">
+                    <div className="text-sm text-gray-300">GROQ API Key:</div>
+                    <div className={`text-lg font-bold ${
+                      systemStatus.environment?.GROQ_API_KEY?.exists ? 'text-green-400' : 'text-red-400'
+                    }`}>
+                      {systemStatus.environment?.GROQ_API_KEY?.exists ? 'Present' : 'Missing'}
+                    </div>
+                    {systemStatus.environment?.GROQ_API_KEY?.exists && (
+                      <div className="text-xs text-gray-400 mt-1">
+                        Length: {systemStatus.environment.GROQ_API_KEY.length} chars
+                      </div>
+                    )}
+                  </div>
+                  <div className="bg-gray-600 rounded p-3">
+                    <div className="text-sm text-gray-300">Vercel Env:</div>
+                    <div className="text-lg font-bold text-green-400">
+                      {systemStatus.environment?.VERCEL_ENV || 'Local'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* File System */}
+              <div className="bg-gray-700 rounded-lg p-4">
+                <h3 className="text-lg font-semibold mb-3 text-blue-400">📁 File System</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-gray-600 rounded p-3">
+                    <div className="text-sm text-gray-300">Knowledge Base:</div>
+                    <div className={`text-lg font-bold ${
+                      systemStatus.fileSystem?.knowledgeBase?.exists ? 'text-green-400' : 'text-red-400'
+                    }`}>
+                      {systemStatus.fileSystem?.knowledgeBase?.exists ? 'Available' : 'Missing'}
+                    </div>
+                    {systemStatus.fileSystem?.knowledgeBase?.exists && (
+                      <div className="text-xs text-gray-400 mt-1">
+                        Size: {systemStatus.fileSystem.knowledgeBase.size} bytes
+                      </div>
+                    )}
+                  </div>
+                  <div className="bg-gray-600 rounded p-3">
+                    <div className="text-sm text-gray-300">Response Time:</div>
+                    <div className="text-lg font-bold text-green-400">
+                      {systemStatus.responseTime}ms
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Groq API Test */}
+              <div className="bg-gray-700 rounded-lg p-4">
+                <h3 className="text-lg font-semibold mb-3 text-blue-400">🤖 Groq API</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-gray-600 rounded p-3">
+                    <div className="text-sm text-gray-300">Connection:</div>
+                    <div className={`text-lg font-bold ${
+                      systemStatus.groqApi?.success ? 'text-green-400' : 'text-red-400'
+                    }`}>
+                      {systemStatus.groqApi?.success ? 'Connected' : 'Failed'}
+                    </div>
+                  </div>
+                  <div className="bg-gray-600 rounded p-3">
+                    <div className="text-sm text-gray-300">Response Time:</div>
+                    <div className="text-lg font-bold text-green-400">
+                      {systemStatus.groqApi?.responseTime || 'N/A'}ms
+                    </div>
+                  </div>
+                </div>
+                {systemStatus.groqApi?.error && (
+                  <div className="mt-2 text-sm text-red-300">
+                    Error: {systemStatus.groqApi.error}
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-gray-400 mb-4">System status not available.</p>
+              <p className="text-sm text-gray-500">
+                Click "Refresh" to check system status.
+              </p>
+            </div>
+          )}
         </div>
 
         {error && (
@@ -430,11 +737,11 @@ export default function TestMemoryPage() {
           {sessions.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-gray-400 mb-4">No conversations found. Try chatting with the AI first!</p>
-                        {environmentInfo?.isVercel && (
-            <p className="text-sm text-gray-500">
-              💡 On Vercel, logs are stored in-memory and will reset between deployments.
-            </p>
-          )}
+              {environmentInfo?.isVercel && (
+                <p className="text-sm text-gray-500">
+                  💡 On Vercel, logs are stored in-memory and will reset between deployments.
+                </p>
+              )}
             </div>
           ) : (
             <div className="space-y-4">

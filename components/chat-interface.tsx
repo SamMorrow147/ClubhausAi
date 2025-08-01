@@ -18,9 +18,11 @@ export function ChatInterface() {
   const [isLightMode, setIsLightMode] = useState(false)
   // Add persistent session ID
   const [sessionId] = useState(() => `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`)
+  const [lastError, setLastError] = useState<any>(null)
+  const [hasFirstMessage, setHasFirstMessage] = useState(false)
   const cardRef = useRef<HTMLDivElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-
+  const initialGifRef = useRef<HTMLDivElement>(null)
 
 
   // Function to convert plain text URLs to markdown links
@@ -98,9 +100,18 @@ export function ChatInterface() {
       content: input.trim()
     }
 
+    // Trigger animation on first message
+    if (messages.length === 0) {
+      // Small delay to ensure smooth animation
+      setTimeout(() => {
+        setHasFirstMessage(true)
+      }, 100)
+    }
+
     setMessages(prev => [...prev, userMessage])
     setInput('')
     setIsLoading(true)
+    setLastError(null) // Clear previous errors
 
     try {
       const response = await fetch('/api/chat', {
@@ -115,7 +126,10 @@ export function ChatInterface() {
       })
 
       if (!response.ok) {
-        throw new Error('Failed to get response')
+        const errorData = await response.json()
+        console.error('Chat API error response:', errorData)
+        setLastError(errorData)
+        throw new Error(errorData.error || 'Failed to get response')
       }
 
       const data = await response.json()
@@ -147,8 +161,17 @@ export function ChatInterface() {
       content: question
     }
 
+    // Trigger animation on first message
+    if (messages.length === 0) {
+      // Small delay to ensure smooth animation
+      setTimeout(() => {
+        setHasFirstMessage(true)
+      }, 100)
+    }
+
     setMessages(prev => [...prev, userMessage])
     setIsLoading(true)
+    setLastError(null) // Clear previous errors
 
     try {
       const response = await fetch('/api/chat', {
@@ -163,7 +186,10 @@ export function ChatInterface() {
       })
 
       if (!response.ok) {
-        throw new Error('Failed to get response')
+        const errorData = await response.json()
+        console.error('Chat API error response:', errorData)
+        setLastError(errorData)
+        throw new Error(errorData.error || 'Failed to get response')
       }
 
       const data = await response.json()
@@ -213,12 +239,6 @@ export function ChatInterface() {
               </g>
             </svg>
             <h2 className="glow-text" data-text="Clubhaus AI">Clubhaus AI</h2>
-            <img 
-              src="/logo192.png" 
-              alt="Clubhaus Logo" 
-              className="w-6 h-6 object-contain opacity-70"
-              style={{ cursor: 'pointer' }}
-            />
           </header>
           
           {/* SVG Filters for Glow Effect */}
@@ -286,27 +306,42 @@ export function ChatInterface() {
           </svg>
           
           <div className="content">
+            {/* Animated GIF - always rendered but positioned based on state */}
+            {(messages.length === 0 || hasFirstMessage) && (
+              <div 
+                ref={initialGifRef}
+                className={`gif-animation-container ${
+                  hasFirstMessage 
+                    ? 'animate-to-corner' 
+                    : 'w-32 h-32 mx-auto mb-4 relative'
+                }`}
+              >
+              {/* Blurred background layer for flow effect */}
+              <img 
+                src="/gifs/Small-Transparent-messeger-app-Chip.gif" 
+                alt="Clubhaus AI Assistant" 
+                className={`gif-blur-layer w-full h-full object-contain absolute inset-0 blur-sm opacity-60 scale-110 ${
+                  hasFirstMessage ? 'fade-out' : ''
+                }`}
+              />
+              {/* Main GIF layer */}
+              <img 
+                src="/gifs/Small-Transparent-messeger-app-Chip.gif" 
+                alt="Clubhaus AI Assistant" 
+                className="w-full h-full object-contain relative z-10"
+              />
+                </div>
+              )}
+
             <div className="messages-container">
               {messages.length === 0 ? (
-                <div className="text-center py-8">
-                  <div className="w-32 h-32 mx-auto mb-4 relative">
-                    {/* Blurred background layer for flow effect */}
-                    <img 
-                      src="/gifs/Small-Transparent-messeger-app-Chip.gif" 
-                      alt="Clubhaus AI Assistant" 
-                      className="w-full h-full object-contain absolute inset-0 blur-sm opacity-60 scale-110"
-                    />
-                    {/* Main GIF layer */}
-                    <img 
-                      src="/gifs/Small-Transparent-messeger-app-Chip.gif" 
-                      alt="Clubhaus AI Assistant" 
-                      className="w-full h-full object-contain relative z-10"
-                    />
-                  </div>
+                <div className="text-center py-8" style={{ paddingTop: '5rem' }}>
 
                   <p className={`mb-6 ${isLightMode ? 'text-blue-900/80' : 'text-white/80'}`}>
                     A Clubhaus AI built to talk with you about your project or our business. Whether you're here to build something bold or just exploring, I'm here to help.
                   </p>
+                  
+
                   <div className="hidden md:grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg mx-auto">
                     {quickQuestions.map((question, index) => (
                       <Button
@@ -402,6 +437,25 @@ export function ChatInterface() {
               }`}>
                 Powered by Clubhaus Agency's Knowledge bank
               </p>
+              
+              {/* Error Display */}
+              {lastError && (
+                <div className={`mt-2 p-2 rounded text-xs text-center ${
+                  isLightMode 
+                    ? 'bg-red-100 text-red-800 border border-red-200' 
+                    : 'bg-red-900/20 text-red-300 border border-red-700/30'
+                }`}>
+                  <p>An error occurred. Check the debug panel for details.</p>
+                  <a 
+                    href="/test-memory" 
+                    className={`underline hover:no-underline ${
+                      isLightMode ? 'text-red-700' : 'text-red-400'
+                    }`}
+                  >
+                    View Debug Info →
+                  </a>
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -253,14 +253,19 @@
 
 .glow-card .inner header {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
   padding: 0px 10px 0px;
   background: transparent;
+  position: relative;
 }
 
 .glow-card .inner svg {
   height: 24px;
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .glow-card .content {
@@ -1040,4 +1045,30 @@ body.light {
 .light .glow-text:hover::after {
   animation: lightGlowPulse 1s ease-in-out infinite;
   opacity: 0.9;
-} 
+}
+
+/* GIF Animation Styles */
+.gif-animation-container {
+  transition: all 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.gif-animation-container.animate-to-corner {
+  position: fixed !important;
+  top: 6px !important;
+  right: 3px !important;
+  width: 3rem !important;
+  height: 3rem !important;
+  z-index: 50;
+  margin: 0 !important;
+  transform: none !important;
+}
+
+.gif-blur-layer {
+  transition: opacity 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.gif-blur-layer.fade-out {
+  opacity: 0 !important;
+}
+
+/* Logo fade out animation - removed since logo is no longer present */ 

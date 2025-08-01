@@ -87,8 +87,11 @@ function searchKnowledge(query: string, knowledgeContent: string): string {
 }
 
 export async function POST(req: Request) {
+  const startTime = Date.now()
+  const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  
   try {
-    console.log('🔍 Chat API called')
+    console.log(`🔍 Chat API called [${requestId}]`)
     console.log('🔑 GROQ_API_KEY exists:', !!process.env.GROQ_API_KEY)
     console.log('🔑 GROQ_API_KEY starts with:', process.env.GROQ_API_KEY?.substring(0, 10))
     
@@ -98,7 +101,10 @@ export async function POST(req: Request) {
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
       console.log('❌ No messages provided')
       return new Response(
-        JSON.stringify({ error: 'Messages array is required' }),
+        JSON.stringify({ 
+          error: 'Messages array is required',
+          debug: { requestId, errorType: 'VALIDATION_ERROR' }
+        }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       )
     }
@@ -108,7 +114,10 @@ export async function POST(req: Request) {
     if (lastMessage.role !== 'user') {
       console.log('❌ Last message is not from user')
       return new Response(
-        JSON.stringify({ error: 'Last message must be from user' }),
+        JSON.stringify({ 
+          error: 'Last message must be from user',
+          debug: { requestId, errorType: 'VALIDATION_ERROR' }
+        }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       )
     }
@@ -132,10 +141,16 @@ export async function POST(req: Request) {
     }
     
     // Log the user message
-    await logger.logUserMessage(userId, lastMessage.content, {
-      sessionId,
-      extractedProfile: Object.keys(extractedInfo).length > 0 ? extractedInfo : undefined
-    })
+    try {
+      await logger.logUserMessage(userId, lastMessage.content, {
+        sessionId,
+        extractedProfile: Object.keys(extractedInfo).length > 0 ? extractedInfo : undefined,
+        requestId
+      })
+    } catch (logError) {
+      console.error('❌ Failed to log user message:', logError)
+      // Don't fail the request if logging fails
+    }
 
     // Check for project triggers first
     const projectTrigger = checkProjectTriggers(lastMessage.content)
@@ -145,7 +160,8 @@ export async function POST(req: Request) {
         JSON.stringify({ 
           message: projectTrigger.response.text,
           context: `Project trigger: ${projectTrigger.name}`,
-          projectTrigger: projectTrigger
+          projectTrigger: projectTrigger,
+          debug: { requestId, responseType: 'PROJECT_TRIGGER' }
         }),
         { 
           status: 200, 
@@ -197,7 +213,8 @@ export async function POST(req: Request) {
           JSON.stringify({ 
             message: finalResponse,
             context: 'Brewery strategic response with details',
-            breweryState: newState
+            breweryState: newState,
+            debug: { requestId, responseType: 'STRATEGIC_BREWERY' }
           }),
           { 
             status: 200, 
@@ -231,7 +248,8 @@ export async function POST(req: Request) {
           JSON.stringify({ 
             message: finalResponse,
             context: 'Mural strategic response with details',
-            muralState: newState
+            muralState: newState,
+            debug: { requestId, responseType: 'STRATEGIC_MURAL' }
           }),
           { 
             status: 200, 
@@ -244,7 +262,8 @@ export async function POST(req: Request) {
         return new Response(
           JSON.stringify({ 
             message: formattedResponse,
-            context: 'Strategic response triggered'
+            context: 'Strategic response triggered',
+            debug: { requestId, responseType: 'STRATEGIC' }
           }),
           { 
             status: 200, 
@@ -392,6 +411,7 @@ Use this information to inform your responses, but speak like a sharp, curious c
     console.log('🤖 Calling Groq API with', conversationMessages.length, 'messages...')
 
     // Get the response using the Groq API directly
+    const groqStartTime = Date.now()
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -406,10 +426,31 @@ Use this information to inform your responses, but speak like a sharp, curious c
       }),
     })
 
+    const groqResponseTime = Date.now() - groqStartTime
+    console.log(`⏱️ Groq API response time: ${groqResponseTime}ms`)
+
     if (!response.ok) {
       const errorData = await response.json()
       console.error('❌ Groq API error:', errorData)
-      throw new Error(`Groq API error: ${errorData.error?.message || 'Unknown error'}`)
+      console.error('❌ Response status:', response.status)
+      console.error('❌ Response headers:', Object.fromEntries(response.headers.entries()))
+      
+      // Enhanced error logging
+      const errorInfo = {
+        requestId,
+        errorType: 'GROQ_API_ERROR',
+        status: response.status,
+        statusText: response.statusText,
+        errorData,
+        groqResponseTime,
+        totalTime: Date.now() - startTime,
+        userMessage: lastMessage.content.substring(0, 100) + '...',
+        messageCount: messages.length
+      }
+      
+      console.error('❌ Detailed error info:', errorInfo)
+      
+      throw new Error(`Groq API error: ${errorData.error?.message || 'Unknown error'} (Status: ${response.status})`)
     }
 
     const data = await response.json()
@@ -433,7 +474,8 @@ Use this information to inform your responses, but speak like a sharp, curious c
           estimatedPromptTokens,
           estimatedCompletionTokens,
           maxTokensLimit: 500,
-          responseLength: aiResponse.length
+          responseLength: aiResponse.length,
+          requestId
         }
       )
 
@@ -519,7 +561,9 @@ Use this information to inform your responses, but speak like a sharp, curious c
     try {
       await logger.logAIResponse(userId, aiResponse, {
         sessionId,
-        projectType: detectedProjectType || 'general'
+        projectType: detectedProjectType || 'general',
+        requestId,
+        responseTime: Date.now() - startTime
       })
     } catch (memoryError) {
       console.error('❌ Failed to log AI response:', memoryError)
@@ -530,7 +574,13 @@ Use this information to inform your responses, but speak like a sharp, curious c
     return new Response(
       JSON.stringify({ 
         message: aiResponse,
-        context: relevantContext.substring(0, 200) + '...'
+        context: relevantContext.substring(0, 200) + '...',
+        debug: { 
+          requestId, 
+          responseType: 'AI_RESPONSE',
+          responseTime: Date.now() - startTime,
+          groqResponseTime
+        }
       }),
       { 
         status: 200, 
@@ -539,23 +589,43 @@ Use this information to inform your responses, but speak like a sharp, curious c
     )
 
   } catch (error: any) {
+    const totalTime = Date.now() - startTime
     console.error('❌ Chat API error:', error)
     console.error('❌ Error details:', {
       message: error.message,
       stack: error.stack,
-      name: error.name
+      name: error.name,
+      requestId,
+      totalTime
     })
+    
+    // Enhanced error response with debugging info
+    const errorResponse = {
+      error: 'An error occurred while processing your request. Please try again.',
+      debug: {
+        requestId,
+        errorType: 'GENERAL_ERROR',
+        errorMessage: error.message,
+        errorName: error.name,
+        totalTime,
+        timestamp: new Date().toISOString()
+      }
+    }
     
     // Handle specific error types
     if (error.message?.includes('API key') || error.message?.includes('401')) {
-      return new Response(
-        JSON.stringify({ error: 'API configuration error. Please check your GROQ_API_KEY.' }),
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
-      )
+      errorResponse.error = 'API configuration error. Please check your GROQ_API_KEY.'
+      errorResponse.debug.errorType = 'API_CONFIG_ERROR'
+    } else if (error.message?.includes('fetch') || error.message?.includes('network')) {
+      errorResponse.error = 'Network error. Please check your connection and try again.'
+      errorResponse.debug.errorType = 'NETWORK_ERROR'
+    } else if (error.message?.includes('timeout')) {
+      errorResponse.error = 'Request timed out. Please try again.'
+      errorResponse.debug.errorType = 'TIMEOUT_ERROR'
     }
 
     return new Response(
-      JSON.stringify({ error: 'An error occurred while processing your request. Please try again.' }),
+      JSON.stringify(errorResponse),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     )
   }
