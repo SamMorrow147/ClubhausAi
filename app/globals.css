@@ -300,6 +300,12 @@
   /* Prevent layout shifts */
   transform: translateZ(0);
   will-change: scroll-position;
+  /* Additional stability fixes */
+  contain: layout style paint;
+  isolation: isolate;
+  /* Prevent scroll chaining */
+  overscroll-behavior-y: contain;
+  overscroll-behavior-x: none;
 }
 
 .messages-container::-webkit-scrollbar {
@@ -321,6 +327,10 @@
   /* Prevent layout shifts during scroll */
   transform: translateZ(0);
   backface-visibility: hidden;
+  /* Additional stability for content */
+  contain: layout style;
+  /* Prevent any repaints during scroll */
+  will-change: auto;
 }
 
 .input-container {
@@ -361,6 +371,12 @@
     /* Prevent any layout shifts */
     transform: translateZ(0);
     will-change: scroll-position;
+    /* Additional stability fixes */
+    contain: layout style paint;
+    isolation: isolate;
+    /* Prevent scroll chaining */
+    overscroll-behavior-y: contain;
+    overscroll-behavior-x: none;
   }
   
   /* Desktop input container */
@@ -467,6 +483,12 @@
     /* Prevent any layout shifts */
     transform: translateZ(0);
     will-change: scroll-position;
+    /* Additional stability fixes */
+    contain: layout style paint;
+    isolation: isolate;
+    /* Prevent scroll chaining */
+    overscroll-behavior-y: contain;
+    overscroll-behavior-x: none;
   }
   
   /* Ensure the powered by text stays at bottom */
