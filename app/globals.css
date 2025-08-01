@@ -339,6 +339,38 @@
     height: 80vh;
     max-height: 80vh;
   }
+  
+  /* Desktop absolute positioning for messages */
+  .messages-container {
+    position: absolute;
+    top: 60px; /* Below header */
+    bottom: 120px; /* Above input area */
+    left: 0;
+    right: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scroll-behavior: smooth;
+    overscroll-behavior: contain;
+    box-sizing: border-box;
+  }
+  
+  /* Desktop input container */
+  .input-container {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 120px;
+    z-index: 10;
+    box-sizing: border-box;
+  }
+  
+  /* Desktop content area setup */
+  .glow-card .content {
+    position: relative;
+    height: 100%;
+    overflow: hidden;
+  }
 }
 
 /* Responsive adjustments */
