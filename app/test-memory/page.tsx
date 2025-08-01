@@ -38,6 +38,30 @@ interface EnvironmentInfo {
   storageType: string
 }
 
+interface DailyTokenUsage {
+  date: string
+  totalTokens: number
+  completionTokens: number
+  promptTokens: number
+  requestCount: number
+  uniqueUsers: number
+  uniqueSessions: number
+}
+
+interface TokenUsageData {
+  todayUsage: DailyTokenUsage | null
+  history: DailyTokenUsage[]
+  stats: {
+    totalTokensAllTime: number
+    totalRequests: number
+    avgTokensPerRequest: number
+    mostActiveDate: string | null
+    daysTracked: number
+  }
+  environment: EnvironmentInfo
+  timestamp: string
+}
+
 interface ApiResponse {
   chatLogs: ChatLog[]
   count: number
@@ -56,6 +80,43 @@ export default function TestMemoryPage() {
   const [environmentInfo, setEnvironmentInfo] = useState<EnvironmentInfo | null>(null)
   const [environmentMessage, setEnvironmentMessage] = useState<string>('')
   const [dbConnectionStatus, setDbConnectionStatus] = useState<boolean | null>(null)
+  const [tokenUsageData, setTokenUsageData] = useState<TokenUsageData | null>(null)
+  const [tokenUsageLoading, setTokenUsageLoading] = useState(false)
+  const [tokenUsageError, setTokenUsageError] = useState<string | null>(null)
+
+  const fetchTokenUsage = async () => {
+    setTokenUsageLoading(true)
+    setTokenUsageError(null)
+    try {
+      const response = await fetch('/api/tokens?action=all')
+      if (!response.ok) {
+        throw new Error('Failed to fetch token usage data')
+      }
+      const data: TokenUsageData = await response.json()
+      setTokenUsageData(data)
+    } catch (err) {
+      setTokenUsageError(err instanceof Error ? err.message : 'Failed to fetch token usage data')
+    } finally {
+      setTokenUsageLoading(false)
+    }
+  }
+
+  const resetTokenUsage = async () => {
+    setTokenUsageLoading(true)
+    setTokenUsageError(null)
+    try {
+      const response = await fetch('/api/tokens', { method: 'DELETE' })
+      if (!response.ok) {
+        throw new Error('Failed to reset token usage data')
+      }
+      setTokenUsageData(null)
+      alert('Token usage data reset successfully!')
+    } catch (err) {
+      setTokenUsageError(err instanceof Error ? err.message : 'Failed to reset token usage data')
+    } finally {
+      setTokenUsageLoading(false)
+    }
+  }
 
   const fetchChatLogs = async () => {
     setLoading(true)
@@ -151,6 +212,7 @@ export default function TestMemoryPage() {
 
   useEffect(() => {
     fetchChatLogs()
+    fetchTokenUsage()
   }, [])
 
   return (
@@ -198,8 +260,14 @@ export default function TestMemoryPage() {
           <button onClick={fetchChatLogs} disabled={loading} className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 px-4 py-2 rounded mr-4">
             {loading ? 'Loading...' : 'Refresh Chat Logs'}
           </button>
-          <button onClick={deleteChatLogs} disabled={loading} className="bg-red-600 hover:bg-red-700 disabled:bg-gray-600 px-4 py-2 rounded">
+          <button onClick={deleteChatLogs} disabled={loading} className="bg-red-600 hover:bg-red-700 disabled:bg-gray-600 px-4 py-2 rounded mr-4">
             {loading ? 'Deleting...' : 'Delete All Chat Logs'}
+          </button>
+          <button onClick={fetchTokenUsage} disabled={tokenUsageLoading} className="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 px-4 py-2 rounded mr-4">
+            {tokenUsageLoading ? 'Loading...' : 'Refresh Token Usage'}
+          </button>
+          <button onClick={resetTokenUsage} disabled={tokenUsageLoading} className="bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 px-4 py-2 rounded">
+            {tokenUsageLoading ? 'Resetting...' : 'Reset Token Data'}
           </button>
         </div>
 
@@ -208,6 +276,151 @@ export default function TestMemoryPage() {
             Error: {error}
           </div>
         )}
+
+        {tokenUsageError && (
+          <div className="bg-red-600 text-white p-4 rounded mb-6">
+            Token Usage Error: {tokenUsageError}
+          </div>
+        )}
+
+        {/* Token Usage Dashboard */}
+        <div className="bg-gray-800 rounded-lg p-6 mb-6">
+          <h2 className="text-xl font-semibold mb-4 flex items-center">
+            📊 Daily Token Usage Tracker
+          </h2>
+
+          {tokenUsageLoading ? (
+            <div className="text-center py-8">
+              <p className="text-gray-400">Loading token usage data...</p>
+            </div>
+          ) : tokenUsageData ? (
+            <div className="space-y-6">
+              {/* Today's Usage */}
+              <div className="bg-gray-700 rounded-lg p-4">
+                <h3 className="text-lg font-semibold mb-3 text-blue-400">📅 Today's Usage</h3>
+                {tokenUsageData.todayUsage ? (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-gray-600 rounded p-3">
+                      <div className="text-2xl font-bold text-green-400">
+                        {tokenUsageData.todayUsage.totalTokens.toLocaleString()}
+                      </div>
+                      <div className="text-sm text-gray-300">Total Tokens</div>
+                    </div>
+                    <div className="bg-gray-600 rounded p-3">
+                      <div className="text-2xl font-bold text-blue-400">
+                        {tokenUsageData.todayUsage.requestCount}
+                      </div>
+                      <div className="text-sm text-gray-300">Requests</div>
+                    </div>
+                    <div className="bg-gray-600 rounded p-3">
+                      <div className="text-2xl font-bold text-purple-400">
+                        {tokenUsageData.todayUsage.uniqueUsers}
+                      </div>
+                      <div className="text-sm text-gray-300">Users</div>
+                    </div>
+                    <div className="bg-gray-600 rounded p-3">
+                      <div className="text-2xl font-bold text-yellow-400">
+                        {tokenUsageData.todayUsage.uniqueSessions}
+                      </div>
+                      <div className="text-sm text-gray-300">Sessions</div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-4">
+                    <p className="text-gray-400">No token usage recorded today yet.</p>
+                  </div>
+                )}
+              </div>
+
+              {/* 7-Day History */}
+              <div className="bg-gray-700 rounded-lg p-4">
+                <h3 className="text-lg font-semibold mb-3 text-blue-400">📈 7-Day History</h3>
+                <div className="space-y-2">
+                  {tokenUsageData.history.map((day, index) => (
+                    <div key={day.date} className="flex items-center justify-between py-2 px-3 bg-gray-600 rounded">
+                      <div className="flex items-center space-x-3">
+                        <div className="text-sm font-medium">
+                          {new Date(day.date).toLocaleDateString('en-US', { 
+                            weekday: 'short', 
+                            month: 'short', 
+                            day: 'numeric' 
+                          })}
+                        </div>
+                        <div className="text-xs text-gray-400">
+                          {index === 0 ? '(today)' : index === 1 ? '(yesterday)' : ''}
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-4 text-sm">
+                        <div className="text-green-400 font-medium">
+                          {day.totalTokens.toLocaleString()} tokens
+                        </div>
+                        <div className="text-blue-400">
+                          {day.requestCount} requests
+                        </div>
+                        <div className="text-purple-400">
+                          {day.uniqueUsers} users
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Statistics */}
+              <div className="bg-gray-700 rounded-lg p-4">
+                <h3 className="text-lg font-semibold mb-3 text-blue-400">📊 All-Time Statistics</h3>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                  <div className="bg-gray-600 rounded p-3">
+                    <div className="text-xl font-bold text-green-400">
+                      {tokenUsageData.stats.totalTokensAllTime.toLocaleString()}
+                    </div>
+                    <div className="text-xs text-gray-300">Total Tokens</div>
+                  </div>
+                  <div className="bg-gray-600 rounded p-3">
+                    <div className="text-xl font-bold text-blue-400">
+                      {tokenUsageData.stats.totalRequests}
+                    </div>
+                    <div className="text-xs text-gray-300">Total Requests</div>
+                  </div>
+                  <div className="bg-gray-600 rounded p-3">
+                    <div className="text-xl font-bold text-yellow-400">
+                      {tokenUsageData.stats.avgTokensPerRequest}
+                    </div>
+                    <div className="text-xs text-gray-300">Avg per Request</div>
+                  </div>
+                  <div className="bg-gray-600 rounded p-3">
+                    <div className="text-xl font-bold text-purple-400">
+                      {tokenUsageData.stats.daysTracked}
+                    </div>
+                    <div className="text-xs text-gray-300">Days Tracked</div>
+                  </div>
+                  <div className="bg-gray-600 rounded p-3">
+                    <div className="text-sm font-bold text-orange-400">
+                      {tokenUsageData.stats.mostActiveDate 
+                        ? new Date(tokenUsageData.stats.mostActiveDate).toLocaleDateString()
+                        : 'N/A'
+                      }
+                    </div>
+                    <div className="text-xs text-gray-300">Most Active Day</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Environment Info */}
+              <div className="text-xs text-gray-400 text-center">
+                Storage: {tokenUsageData.environment.storageType} • 
+                Last updated: {new Date(tokenUsageData.timestamp).toLocaleTimeString()}
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-gray-400 mb-4">No token usage data available.</p>
+              <p className="text-sm text-gray-500">
+                Start a conversation with the AI to begin tracking token usage.
+              </p>
+            </div>
+          )}
+        </div>
 
         <div className="bg-gray-800 rounded-lg p-6">
           <h2 className="text-xl font-semibold mb-4">

@@ -8,6 +8,7 @@ import { createMuralResponse, MuralConversationState } from '../../../lib/muralH
 import { checkProjectTriggers } from '../../../lib/projectHandler'
 import SimpleLogger from '../../../lib/simpleLogger'
 import UserProfileService from '../../../lib/userProfileService'
+import TokenUsageService from '../../../lib/tokenUsageService'
 
 // Create Groq provider instance
 const groq = createGroq({
@@ -117,6 +118,7 @@ export async function POST(req: Request) {
     // Initialize simple logger for chat logging
     const logger = SimpleLogger.getInstance()
     const userProfileService = UserProfileService.getInstance()
+    const tokenUsageService = TokenUsageService.getInstance()
     const userId = 'anonymous' // In a real app, this would come from authentication
     const sessionId = providedSessionId || `session_${Date.now()}`
     
@@ -414,6 +416,32 @@ Use this information to inform your responses, but speak like a sharp, curious c
     let aiResponse = data.choices[0]?.message?.content || 'Sorry, I could not generate a response.'
 
     console.log('✅ Got response from Groq')
+
+    // Log token usage (estimate tokens since Groq API doesn't provide usage in response)
+    try {
+      const estimatedPromptTokens = conversationMessages.reduce((total, msg) => total + Math.ceil(msg.content.length / 4), 0)
+      const estimatedCompletionTokens = Math.ceil(aiResponse.length / 4)
+      const totalEstimatedTokens = estimatedPromptTokens + estimatedCompletionTokens
+
+      await tokenUsageService.logTokenUsage(
+        userId,
+        sessionId,
+        'llama-3.1-8b-instant',
+        totalEstimatedTokens,
+        'total',
+        {
+          estimatedPromptTokens,
+          estimatedCompletionTokens,
+          maxTokensLimit: 500,
+          responseLength: aiResponse.length
+        }
+      )
+
+      console.log(`📊 Estimated token usage: ${totalEstimatedTokens} total (${estimatedPromptTokens} prompt + ${estimatedCompletionTokens} completion)`)
+    } catch (tokenError) {
+      console.error('❌ Failed to log token usage:', tokenError)
+      // Don't fail the request if token logging fails
+    }
 
     // Check if this might be a brewery follow-up conversation
     const breweryKeywords = ['brewery', 'beer', 'brewing', 'omni', 'location', 'bear', 'mascot', 'photo', 'animation', 'interaction', 'website', 'site']
