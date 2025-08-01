@@ -82,8 +82,9 @@
   }
   body {
     @apply bg-background text-foreground;
-    height: 100svh;
-    overflow: auto;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
     background: hsl(var(--h), 18%, 12%);
     -webkit-touch-callout: none;
     -webkit-user-select: none;
@@ -110,8 +111,8 @@
   
   position: relative;
   width: clamp(320px, calc(100svw - calc(var(--pads) * 2)), 800px);
-  height: calc(100svh - calc(var(--pads) * 2));
-  max-height: 700px;
+  height: 100vh;
+  max-height: 100vh;
   border-radius: 1.768em;
   isolation: isolate;
   transform: translate3d(0, 0, 0.01px);
@@ -333,7 +334,7 @@
 @media (max-width: 768px) {
   .messages-container {
     margin-bottom: 0.5rem;
-    padding-bottom: 120px; /* More padding for mobile input */
+    padding-bottom: 80px; /* Reduced padding for better mobile fit */
   }
   
   .input-container {
@@ -342,6 +343,13 @@
     padding-right: 0;
     margin-left: 0;
     margin-right: 0;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 20;
+    background: hsl(var(--h), 18%, 12%);
+    padding-bottom: env(safe-area-inset-bottom);
   }
   
   .cyberpunk-form {
@@ -358,7 +366,9 @@
     --pads: 0px;
     width: 100vw;
     height: 100vh;
-    max-height: none;
+    height: 100dvh; /* Dynamic viewport height for mobile */
+    max-height: 100vh;
+    max-height: 100dvh;
     border-radius: 0;
   }
   
