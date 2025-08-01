@@ -317,7 +317,7 @@ export function ChatInterface() {
   }
 
   return (
-    <div className="h-screen h-dvh flex items-center justify-center p-4 overflow-hidden">
+    <div className="chat-page-container flex items-center justify-center p-4">
       <div className="glow-card" ref={cardRef}>
         <span className="glow"></span>
         <div className="inner">
