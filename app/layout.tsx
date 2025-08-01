@@ -5,8 +5,27 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Clubman',
+  title: 'Clubhaus AI',
   description: 'Your personal AI assistant for all things Clubhaus',
+  openGraph: {
+    title: 'Clubhaus AI',
+    description: 'Your personal AI assistant for all things Clubhaus',
+    images: [
+      {
+        url: '/gifs/Small-Transparent-messeger-app-Chip.gif',
+        width: 1200,
+        height: 630,
+        alt: 'Clubhaus AI Assistant',
+      },
+    ],
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Clubhaus AI',
+    description: 'Your personal AI assistant for all things Clubhaus',
+    images: ['/gifs/Small-Transparent-messeger-app-Chip.gif'],
+  },
 }
 
 export const viewport: Viewport = {

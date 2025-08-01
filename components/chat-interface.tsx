@@ -413,13 +413,13 @@ export function ChatInterface() {
                     {/* Blurred background layer for flow effect */}
                     <img 
                       src="/gifs/Small-Transparent-messeger-app-Chip.gif" 
-                      alt="Clubman AI Assistant" 
+                      alt="Clubhaus AI Assistant" 
                       className="w-full h-full object-contain absolute inset-0 blur-sm opacity-60 scale-110"
                     />
                     {/* Main GIF layer */}
                     <img 
                       src="/gifs/Small-Transparent-messeger-app-Chip.gif" 
-                      alt="Clubman AI Assistant" 
+                      alt="Clubhaus AI Assistant" 
                       className="w-full h-full object-contain relative z-10"
                     />
                   </div>
