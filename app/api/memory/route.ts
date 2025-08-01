@@ -12,8 +12,18 @@ export async function GET(req: NextRequest) {
     
     // Test database connection on Vercel
     let dbConnectionStatus = null
+    let debugInfo = null
     if (envInfo.isVercel) {
       dbConnectionStatus = await logger.testDatabaseConnection()
+      
+      // Add debug information
+      debugInfo = {
+        hasRedisUrl: !!process.env.KV_REST_API_URL,
+        hasRedisToken: !!process.env.KV_REST_API_TOKEN,
+        redisUrlPrefix: process.env.KV_REST_API_URL?.substring(0, 10) || 'not set',
+        hasGroqKey: !!process.env.GROQ_API_KEY,
+        groqKeyPrefix: process.env.GROQ_API_KEY?.substring(0, 10) || 'not set'
+      }
     }
     
     return new Response(
@@ -23,6 +33,7 @@ export async function GET(req: NextRequest) {
         userId,
         environment: envInfo,
         dbConnectionStatus,
+        debugInfo,
         message: envInfo.isVercel 
           ? 'Logs are stored in database on Vercel and persist between deployments' 
           : 'Logs are stored in local file system'
