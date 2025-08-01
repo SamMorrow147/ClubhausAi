@@ -361,7 +361,7 @@
     left: 0;
     right: 0;
     z-index: 20;
-    background: hsl(var(--h), 18%, 12%);
+    background: transparent;
     padding-bottom: calc(env(safe-area-inset-bottom) + 10px);
     border-top: 1px solid rgba(255, 255, 255, 0.1);
     /* Ensure input area covers messages properly */
@@ -496,6 +496,12 @@
   .light .glow-card .inner header {
     background: hsl(260, 25%, 95%);
     border-bottom: 1px solid rgba(59, 130, 246, 0.1);
+  }
+  
+  /* Light mode input container */
+  .light .input-container {
+    background: transparent;
+    box-shadow: 0 -10px 20px hsl(260, 25%, 95%);
   }
 }
 
