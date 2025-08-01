@@ -285,7 +285,7 @@
   -ms-overflow-style: none;
   margin-bottom: 0;
   min-height: 0; /* Important for flex child */
-  padding-bottom: 0; /* Remove padding, use height calculation instead */  
+  padding-bottom: 0; /* Remove padding, use positioning instead */  
   position: relative;
   border-radius: 1.768em; /* Match the card's border radius */
   /* Ensure smooth scrolling */
@@ -307,11 +307,13 @@
   flex-direction: column;
   gap: 1rem;
   padding: 1rem;
-  padding-bottom: 4rem; /* More bottom padding for better scroll experience */
-  /* Ensure the list can scroll */
-  min-height: 100%;
+  padding-bottom: 2rem; /* Bottom padding for scroll experience */
+  /* Ensure the list can scroll within its container */
+  min-height: min-content;
   /* Ensure content is never hidden behind input */
   margin-bottom: 0;
+  /* Allow content to grow naturally */
+  flex-grow: 1;
 }
 
 .input-container {
@@ -369,9 +371,9 @@
     border-top: 1px solid rgba(255, 255, 255, 0.1);
     /* Ensure input area covers messages properly */
     box-shadow: 0 -10px 20px hsl(var(--h), 18%, 12%);
-    /* Define height for better calculation */
-    height: auto;
-    min-height: 80px;
+    /* Define exact height to match messages-container bottom value */
+    height: 100px;
+    box-sizing: border-box;
   }
   
   /* Prevent scrolling when keyboard is open */
@@ -397,6 +399,8 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    position: relative; /* Required for absolute positioning of children */
+    height: 100%; /* Ensure full height for absolute positioning */
   }
   
   .messages-container {
@@ -404,11 +408,12 @@
     overflow-y: auto;
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
-    height: calc(100vh - 160px); /* Account for header + input area (80px + 60px for header/spacing) */
-    height: calc(100dvh - 160px);
-    padding-bottom: 0; /* Remove padding, rely on height calculation */
-    margin-bottom: 0;
-    position: relative;
+    /* Use absolute positioning to create definitive boundaries */
+    position: absolute;
+    top: 60px; /* Below header */
+    bottom: 100px; /* Above input area */
+    left: 0;
+    right: 0;
     /* Ensure this container handles all scrolling */
     overscroll-behavior: contain;
     /* Prevent bounce scrolling on iOS */
