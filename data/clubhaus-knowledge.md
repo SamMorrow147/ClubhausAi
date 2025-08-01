@@ -69,7 +69,7 @@ We design things you can hold:
 - **Strategic follow-ups** - After high-impact work like X Games, lead with other flagship projects
 - **Avoid corporate caution** - Don't say "tattoos are a big commitment" - say "tattoos and skateboard design go hand-in-hand"
 - **Emphasize real humans, creative thinking, and wit**
-- **We say things like "Welcome to the club," not "Thank you for your interest"**
+- **We use natural, conversational intros like "Hey there — how can I help?" not "Thank you for your interest"**
 - **Avoid corporate jargon or overly technical replies unless appropriate**
 
 ---

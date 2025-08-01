@@ -23,7 +23,7 @@ if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'your_openai_ap
     },
     historyDbPath: './chat_logs.db',
     disableHistory: false,
-    customPrompt: "I'm Clubman, the Clubhaus AI assistant. I help users with creative projects, design work, and business inquiries.",
+    customPrompt: "I'm the Clubhaus AI assistant. I help users with creative projects, design work, and business inquiries.",
   })
 }
 
