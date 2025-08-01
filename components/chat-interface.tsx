@@ -405,7 +405,7 @@ export function ChatInterface() {
             <div className="messages-container">
               {messages.length === 0 ? (
                 <div className="text-center py-8">
-                  <div className="w-16 h-16 mx-auto mb-4">
+                  <div className="w-32 h-32 mx-auto mb-4">
                     <img 
                       src="/gifs/Small-Transparent-messeger-app-Chip.gif" 
                       alt="Clubman AI Assistant" 
