@@ -8,12 +8,17 @@ export async function GET(req: NextRequest) {
     
     const logger = SimpleLogger.getInstance()
     const chatLogs = await logger.getAllChatLogs(userId)
+    const envInfo = logger.getEnvironmentInfo()
     
     return new Response(
       JSON.stringify({ 
         chatLogs,
         count: chatLogs.length,
-        userId 
+        userId,
+        environment: envInfo,
+        message: envInfo.isVercel 
+          ? 'Logs are stored in-memory on Vercel and will reset between deployments' 
+          : 'Logs are stored in local file system'
       }),
       { 
         status: 200, 
@@ -23,7 +28,10 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     console.error('❌ Memory API error:', error)
     return new Response(
-      JSON.stringify({ error: 'Failed to retrieve chat logs' }),
+      JSON.stringify({ 
+        error: 'Failed to retrieve chat logs',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     )
   }
@@ -36,11 +44,13 @@ export async function DELETE(req: NextRequest) {
     
     const logger = SimpleLogger.getInstance()
     await logger.deleteAllChatLogs(userId)
+    const envInfo = logger.getEnvironmentInfo()
     
     return new Response(
       JSON.stringify({ 
         message: 'All chat logs deleted successfully',
-        userId 
+        userId,
+        environment: envInfo
       }),
       { 
         status: 200, 
@@ -50,7 +60,10 @@ export async function DELETE(req: NextRequest) {
   } catch (error) {
     console.error('❌ Memory deletion error:', error)
     return new Response(
-      JSON.stringify({ error: 'Failed to delete chat logs' }),
+      JSON.stringify({ 
+        error: 'Failed to delete chat logs',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     )
   }

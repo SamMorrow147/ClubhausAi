@@ -22,12 +22,27 @@ interface ConversationSession {
   endTime: string
 }
 
+interface EnvironmentInfo {
+  isVercel: boolean
+  storageType: string
+}
+
+interface ApiResponse {
+  chatLogs: ChatLog[]
+  count: number
+  userId: string
+  environment: EnvironmentInfo
+  message: string
+}
+
 export default function TestMemoryPage() {
   const [chatLogs, setChatLogs] = useState<ChatLog[]>([])
   const [sessions, setSessions] = useState<ConversationSession[]>([])
   const [expandedSessions, setExpandedSessions] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [environmentInfo, setEnvironmentInfo] = useState<EnvironmentInfo | null>(null)
+  const [environmentMessage, setEnvironmentMessage] = useState<string>('')
 
   const fetchChatLogs = async () => {
     setLoading(true)
@@ -37,9 +52,11 @@ export default function TestMemoryPage() {
       if (!response.ok) {
         throw new Error('Failed to fetch chat logs')
       }
-      const data = await response.json()
+      const data: ApiResponse = await response.json()
       const logs = data.chatLogs || []
       setChatLogs(logs)
+      setEnvironmentInfo(data.environment)
+      setEnvironmentMessage(data.message)
       
       // Group logs by session
       const sessionMap = new Map<string, ChatLog[]>()
@@ -115,6 +132,31 @@ export default function TestMemoryPage() {
       <div className="max-w-4xl mx-auto">
         <h1 className="text-3xl font-bold mb-8">Chat Logs Dashboard</h1>
 
+        {/* Environment Info */}
+        {environmentInfo && (
+          <div className={`mb-6 p-4 rounded-lg ${
+            environmentInfo.isVercel 
+              ? 'bg-yellow-600 text-yellow-100' 
+              : 'bg-green-600 text-green-100'
+          }`}>
+            <div className="flex items-center space-x-2 mb-2">
+              <span className="font-semibold">
+                {environmentInfo.isVercel ? '🚀 Vercel Environment' : '💻 Local Environment'}
+              </span>
+              <span className="text-sm opacity-75">
+                Storage: {environmentInfo.storageType}
+              </span>
+            </div>
+            <p className="text-sm opacity-90">{environmentMessage}</p>
+            {environmentInfo.isVercel && (
+              <p className="text-sm opacity-75 mt-2">
+                💡 <strong>Note:</strong> On Vercel, logs are stored in-memory and will reset between deployments. 
+                For persistent logging, consider using a database service.
+              </p>
+            )}
+          </div>
+        )}
+
         <div className="mb-6">
           <button onClick={fetchChatLogs} disabled={loading} className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 px-4 py-2 rounded mr-4">
             {loading ? 'Loading...' : 'Refresh Chat Logs'}
@@ -136,7 +178,14 @@ export default function TestMemoryPage() {
           </h2>
 
           {sessions.length === 0 ? (
-            <p className="text-gray-400">No conversations found. Try chatting with the AI first!</p>
+            <div className="text-center py-8">
+              <p className="text-gray-400 mb-4">No conversations found. Try chatting with the AI first!</p>
+                        {environmentInfo?.isVercel && (
+            <p className="text-sm text-gray-500">
+              💡 On Vercel, logs are stored in-memory and will reset between deployments.
+            </p>
+          )}
+            </div>
           ) : (
             <div className="space-y-4">
               {sessions.map((session) => (
@@ -236,6 +285,11 @@ export default function TestMemoryPage() {
             <li>Click on any session to expand and view the full conversation</li>
             <li>Each session shows the complete back-and-forth between you and the AI</li>
             <li>Use the delete button to clear all logs when testing</li>
+            {environmentInfo?.isVercel && (
+              <li className="text-yellow-400">
+                ⚠️ <strong>Vercel Note:</strong> Logs are stored in-memory and will reset between deployments
+              </li>
+            )}
           </ol>
         </div>
       </div>

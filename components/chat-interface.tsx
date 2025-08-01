@@ -19,6 +19,8 @@ export function ChatInterface() {
   const cardRef = useRef<HTMLDivElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
+
+
   // Function to convert plain text URLs to markdown links
   const convertUrlsToMarkdown = (text: string): string => {
     // URL regex pattern - more robust to handle various URL formats

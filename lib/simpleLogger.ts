@@ -15,11 +15,17 @@ export class SimpleLogger {
   private static instance: SimpleLogger
   private logDir: string
   private logFile: string
+  private isVercel: boolean
+  private inMemoryLogs: ChatLog[] = []
 
   private constructor() {
+    this.isVercel = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production'
     this.logDir = path.join(process.cwd(), 'logs')
     this.logFile = path.join(this.logDir, 'chat_logs.json')
-    this.ensureLogDirectory()
+    
+    if (!this.isVercel) {
+      this.ensureLogDirectory()
+    }
   }
 
   public static getInstance(): SimpleLogger {
@@ -36,6 +42,12 @@ export class SimpleLogger {
   }
 
   private readLogs(): ChatLog[] {
+    // On Vercel, use in-memory storage
+    if (this.isVercel) {
+      return this.inMemoryLogs
+    }
+    
+    // On local, read from file
     try {
       if (!fs.existsSync(this.logFile)) {
         return []
@@ -49,6 +61,13 @@ export class SimpleLogger {
   }
 
   private writeLogs(logs: ChatLog[]): void {
+    // On Vercel, store in memory
+    if (this.isVercel) {
+      this.inMemoryLogs = logs
+      return
+    }
+    
+    // On local, write to file
     try {
       fs.writeFileSync(this.logFile, JSON.stringify(logs, null, 2))
     } catch (error) {
@@ -84,7 +103,7 @@ export class SimpleLogger {
     logs.push(logEntry)
     this.writeLogs(logs)
 
-    console.log('📝 Logged user message for user:', userId)
+    console.log('📝 Logged user message for user:', userId, this.isVercel ? '(Vercel - in-memory)' : '(Local - file)')
   }
 
   /**
@@ -115,7 +134,7 @@ export class SimpleLogger {
     logs.push(logEntry)
     this.writeLogs(logs)
 
-    console.log('🤖 Logged AI response for user:', userId)
+    console.log('🤖 Logged AI response for user:', userId, this.isVercel ? '(Vercel - in-memory)' : '(Local - file)')
   }
 
   /**
@@ -197,6 +216,16 @@ export class SimpleLogger {
       totalUsers: users.size,
       totalSessions: sessions.size,
       userStats
+    }
+  }
+
+  /**
+   * Get environment info
+   */
+  getEnvironmentInfo(): { isVercel: boolean; storageType: string } {
+    return {
+      isVercel: this.isVercel,
+      storageType: this.isVercel ? 'in-memory' : 'file-system'
     }
   }
 }
