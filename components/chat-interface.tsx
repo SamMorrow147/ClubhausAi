@@ -409,11 +409,18 @@ export function ChatInterface() {
             <div className="messages-container">
               {messages.length === 0 ? (
                 <div className="text-center py-8">
-                  <div className="w-32 h-32 mx-auto mb-4">
+                  <div className="w-32 h-32 mx-auto mb-4 relative">
+                    {/* Blurred background layer for flow effect */}
                     <img 
                       src="/gifs/Small-Transparent-messeger-app-Chip.gif" 
                       alt="Clubman AI Assistant" 
-                      className="w-full h-full object-contain"
+                      className="w-full h-full object-contain absolute inset-0 blur-sm opacity-60 scale-110"
+                    />
+                    {/* Main GIF layer */}
+                    <img 
+                      src="/gifs/Small-Transparent-messeger-app-Chip.gif" 
+                      alt="Clubman AI Assistant" 
+                      className="w-full h-full object-contain relative z-10"
                     />
                   </div>
 

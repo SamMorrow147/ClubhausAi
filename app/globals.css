@@ -289,14 +289,17 @@
   padding-bottom: 0; /* Remove padding, use positioning instead */  
   position: relative;
   border-radius: 1.768em; /* Match the card's border radius */
-  /* Ensure smooth scrolling */
-  scroll-behavior: smooth;
+  /* Disable smooth scrolling to prevent glitching */
+  scroll-behavior: auto;
   /* Force scroll to bottom */
   display: flex;
   flex-direction: column;
   /* Ensure proper scrolling behavior */
   overscroll-behavior: contain;
   box-sizing: border-box;
+  /* Prevent layout shifts */
+  transform: translateZ(0);
+  will-change: scroll-position;
 }
 
 .messages-container::-webkit-scrollbar {
@@ -315,6 +318,9 @@
   margin-bottom: 0;
   /* Allow content to grow naturally */
   flex-grow: 1;
+  /* Prevent layout shifts during scroll */
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 .input-container {
@@ -349,9 +355,12 @@
     right: 0;
     overflow-y: auto;
     overflow-x: hidden;
-    scroll-behavior: smooth;
+    scroll-behavior: auto;
     overscroll-behavior: contain;
     box-sizing: border-box;
+    /* Prevent any layout shifts */
+    transform: translateZ(0);
+    will-change: scroll-position;
   }
   
   /* Desktop input container */
@@ -451,10 +460,13 @@
     overscroll-behavior: contain;
     /* Prevent bounce scrolling on iOS */
     -webkit-overflow-scrolling: touch;
-    /* Ensure smooth scrolling */
-    scroll-behavior: smooth;
+    /* Disable smooth scrolling to prevent glitching */
+    scroll-behavior: auto;
     /* Ensure content doesn't get hidden */
     box-sizing: border-box;
+    /* Prevent any layout shifts */
+    transform: translateZ(0);
+    will-change: scroll-position;
   }
   
   /* Ensure the powered by text stays at bottom */
@@ -606,6 +618,7 @@
 .sun {
   opacity: 0.25;
   transition: all 0.2s ease;
+  color: white;
 }
 
 .sun:hover {
@@ -815,8 +828,8 @@ body.light {
 
 /* Light mode styling for cyberpunk form */
 .light .input-container {
-  background: hsl(260, 25%, 95%);
-  box-shadow: 0 -10px 20px hsl(260, 25%, 95%);
+  background: transparent;
+  box-shadow: none;
 }
 
 .light .cyberpunk-input {
