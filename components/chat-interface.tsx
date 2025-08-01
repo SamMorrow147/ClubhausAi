@@ -52,136 +52,16 @@ export function ChatInterface() {
     )
   }
 
-  // Auto-scroll to bottom when new messages are added
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ 
-      behavior: 'smooth',
-      block: 'end',
-      inline: 'nearest'
-    })
-  }
-
+  // Simple auto-scroll to bottom when new messages are added
   useEffect(() => {
-    scrollToBottom()
-  }, [messages, isLoading])
-
-  // More robust scroll system with multiple fallbacks
-  useEffect(() => {
-    const scrollToBottomWithFallbacks = () => {
-      const messagesContainer = document.querySelector('.messages-container') as HTMLElement
-      if (!messagesContainer) return
-
-      // Method 1: Direct scroll to bottom
-      const scrollToBottom = () => {
-        messagesContainer.scrollTop = messagesContainer.scrollHeight
-      }
-
-      // Method 2: Use scrollIntoView on the last message
-      const scrollToLastMessage = () => {
-        const lastMessage = messagesContainer.querySelector('.messages-list > div:last-child')
-        if (lastMessage) {
-          lastMessage.scrollIntoView({ 
-            behavior: 'smooth', 
-            block: 'end' 
-          })
-        }
-      }
-
-      // Method 3: Use the messagesEndRef
-      const scrollToEndRef = () => {
-        messagesEndRef.current?.scrollIntoView({ 
-          behavior: 'smooth',
-          block: 'end'
-        })
-      }
-
-      // Method 4: Force scroll with timeout
-      const forceScroll = () => {
-        setTimeout(() => {
-          messagesContainer.scrollTop = messagesContainer.scrollHeight
-        }, 10)
-      }
-
-      // Execute all methods with delays to ensure DOM updates
-      scrollToBottom()
-      forceScroll()
-      
-      // Use requestAnimationFrame for smooth execution
-      requestAnimationFrame(() => {
-        scrollToLastMessage()
-        
-        // Additional delay for dynamic content
-        setTimeout(() => {
-          scrollToEndRef()
-          scrollToBottom() // Final fallback
-          forceScroll() // Extra force
-        }, 50)
-      })
-    }
-
-    // Execute immediately
-    scrollToBottomWithFallbacks()
-    
-    // Execute again after a short delay to handle any dynamic content
-    setTimeout(scrollToBottomWithFallbacks, 100)
-    
-    // Execute one more time after a longer delay for any async content
-    setTimeout(scrollToBottomWithFallbacks, 300)
-    
-    // Final execution after content is fully rendered
-    setTimeout(scrollToBottomWithFallbacks, 500)
-  }, [messages, isLoading])
-
-  // Additional scroll effect for better UX
-  useEffect(() => {
-    const messagesContainer = document.querySelector('.messages-container')
-    if (messagesContainer && messages.length > 0) {
-      // Use requestAnimationFrame to ensure DOM is updated
-      requestAnimationFrame(() => {
-        messagesContainer.scrollTop = messagesContainer.scrollHeight
-      })
-    }
-  }, [messages, isLoading])
-
-  // Ensure scroll to bottom on initial load and when messages change
-  useEffect(() => {
-    const messagesContainer = document.querySelector('.messages-container')
+    const messagesContainer = document.querySelector('.messages-container') as HTMLElement
     if (messagesContainer) {
-      const scrollToBottom = () => {
-        // Account for the input container height when scrolling
-        const inputContainer = document.querySelector('.input-container') as HTMLElement
-        const inputHeight = inputContainer ? inputContainer.offsetHeight : 120
-        messagesContainer.scrollTop = messagesContainer.scrollHeight - inputHeight
-      }
-      
-      // Immediate scroll
-      scrollToBottom()
-      
-      // Delayed scroll to handle any dynamic content
-      setTimeout(scrollToBottom, 100)
+      // Simple, direct scroll to bottom - no conflicts
+      setTimeout(() => {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight
+      }, 100)
     }
   }, [messages, isLoading])
-
-  // Mutation observer to watch for DOM changes
-  useEffect(() => {
-    const messagesContainer = document.querySelector('.messages-container')
-    if (!messagesContainer) return
-
-    const observer = new MutationObserver(() => {
-      // Force scroll to bottom whenever DOM changes
-      requestAnimationFrame(() => {
-        messagesContainer.scrollTop = messagesContainer.scrollHeight
-      })
-    })
-
-    observer.observe(messagesContainer, {
-      childList: true,
-      subtree: true,
-      characterData: true
-    })
-
-    return () => observer.disconnect()
-  }, [])
 
   // Pointer tracking for glowing effect
   useEffect(() => {

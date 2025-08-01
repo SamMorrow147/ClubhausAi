@@ -285,27 +285,13 @@
   scrollbar-width: none;
   -ms-overflow-style: none;
   margin-bottom: 0;
-  min-height: 0; /* Important for flex child */
-  padding-bottom: 0; /* Remove padding, use positioning instead */  
+  min-height: 0;
+  padding-bottom: 0;
   position: relative;
-  border-radius: 1.768em; /* Match the card's border radius */
-  /* Disable smooth scrolling to prevent glitching */
-  scroll-behavior: auto;
-  /* Force scroll to bottom */
+  border-radius: 1.768em;
   display: flex;
   flex-direction: column;
-  /* Ensure proper scrolling behavior */
-  overscroll-behavior: contain;
   box-sizing: border-box;
-  /* Prevent layout shifts */
-  transform: translateZ(0);
-  will-change: scroll-position;
-  /* Additional stability fixes */
-  contain: layout style paint;
-  isolation: isolate;
-  /* Prevent scroll chaining */
-  overscroll-behavior-y: contain;
-  overscroll-behavior-x: none;
 }
 
 .messages-container::-webkit-scrollbar {
@@ -317,20 +303,10 @@
   flex-direction: column;
   gap: 1rem;
   padding: 1rem;
-  padding-bottom: 2rem; /* Bottom padding for scroll experience */
-  /* Ensure the list can scroll within its container */
+  padding-bottom: 2rem;
   min-height: min-content;
-  /* Ensure content is never hidden behind input */
   margin-bottom: 0;
-  /* Allow content to grow naturally */
   flex-grow: 1;
-  /* Prevent layout shifts during scroll */
-  transform: translateZ(0);
-  backface-visibility: hidden;
-  /* Additional stability for content */
-  contain: layout style;
-  /* Prevent any repaints during scroll */
-  will-change: auto;
 }
 
 .input-container {
@@ -365,18 +341,7 @@
     right: 0;
     overflow-y: auto;
     overflow-x: hidden;
-    scroll-behavior: auto;
-    overscroll-behavior: contain;
     box-sizing: border-box;
-    /* Prevent any layout shifts */
-    transform: translateZ(0);
-    will-change: scroll-position;
-    /* Additional stability fixes */
-    contain: layout style paint;
-    isolation: isolate;
-    /* Prevent scroll chaining */
-    overscroll-behavior-y: contain;
-    overscroll-behavior-x: none;
   }
   
   /* Desktop input container */
@@ -462,33 +427,17 @@
   }
   
   .messages-container {
-    flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
-    -webkit-overflow-scrolling: touch;
-    /* Use absolute positioning to create definitive boundaries */
+    /* Simple absolute positioning */
     position: absolute;
     top: 60px; /* Below header */
     bottom: 100px; /* Above input area */
     left: 0;
     right: 0;
-    /* Ensure this container handles all scrolling */
-    overscroll-behavior: contain;
-    /* Prevent bounce scrolling on iOS */
-    -webkit-overflow-scrolling: touch;
-    /* Disable smooth scrolling to prevent glitching */
-    scroll-behavior: auto;
-    /* Ensure content doesn't get hidden */
+    /* Basic scroll setup */
+    overflow-y: auto;
+    overflow-x: hidden;
+    /* Remove all fancy properties that might conflict */
     box-sizing: border-box;
-    /* Prevent any layout shifts */
-    transform: translateZ(0);
-    will-change: scroll-position;
-    /* Additional stability fixes */
-    contain: layout style paint;
-    isolation: isolate;
-    /* Prevent scroll chaining */
-    overscroll-behavior-y: contain;
-    overscroll-behavior-x: none;
   }
   
   /* Ensure the powered by text stays at bottom */
