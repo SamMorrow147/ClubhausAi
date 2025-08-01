@@ -84,15 +84,12 @@ Create a `.env.local` file in the root directory:
 ```env
 # Required: Groq API Key for chat completions
 GROQ_API_KEY=your_groq_api_key_here
-
-# Required: OpenAI API Key for embeddings
-OPENAI_API_KEY=your_openai_api_key_here
 ```
 
 **Getting API Keys:**
 
 - **Groq**: Sign up at [console.groq.com](https://console.groq.com) and create an API key
-- **OpenAI**: Get your API key from [platform.openai.com](https://platform.openai.com/api-keys)
+- **Note**: OpenAI embeddings are currently disabled, using text-based search instead
 
 ### 4. Run the Application
 
@@ -188,14 +185,11 @@ vercel env add OPENAI_API_KEY
 
 ### Environment Variables Setup
 
-For both deployment methods, you'll need to set these environment variables:
+For both deployment methods, you'll need to set this environment variable:
 
 ```env
 # Required: Groq API Key for chat completions
 GROQ_API_KEY=your_groq_api_key_here
-
-# Required: OpenAI API Key for embeddings
-OPENAI_API_KEY=your_openai_api_key_here
 ```
 
 ### Other Platforms

@@ -7,7 +7,7 @@ This guide will walk you through deploying your Clubhaus AI Chatbot to Vercel.
 1. **GitHub Repository**: Your code is now pushed to [https://github.com/SamMorrow147/ClubhausAi.git](https://github.com/SamMorrow147/ClubhausAi.git)
 2. **API Keys**: You'll need:
    - **Groq API Key**: Get from [console.groq.com](https://console.groq.com)
-   - **OpenAI API Key**: Get from [platform.openai.com](https://platform.openai.com/api-keys)
+   - **Note**: OpenAI embeddings are currently disabled, using text-based search instead
 
 ## 🎯 Deployment Steps
 
@@ -29,10 +29,9 @@ This guide will walk you through deploying your Clubhaus AI Chatbot to Vercel.
 
 4. **Set Environment Variables**:
    - Click "Environment Variables" section
-   - Add the following variables:
+   - Add the following variable:
      ```
      GROQ_API_KEY=your_actual_groq_api_key_here
-     OPENAI_API_KEY=your_actual_openai_api_key_here
      ```
    - Make sure to select "Production", "Preview", and "Development" environments
 
@@ -61,19 +60,18 @@ vercel
 
 # Set environment variables
 vercel env add GROQ_API_KEY
-vercel env add OPENAI_API_KEY
 ```
 
 ## 🔧 Post-Deployment Configuration
 
 ### 1. Verify Environment Variables
 
-After deployment, verify your environment variables are set correctly:
+After deployment, verify your environment variable is set correctly:
 
 1. Go to your Vercel dashboard
 2. Select your project
 3. Go to "Settings" → "Environment Variables"
-4. Ensure both `GROQ_API_KEY` and `OPENAI_API_KEY` are set
+4. Ensure `GROQ_API_KEY` is set
 
 ### 2. Test Your Deployment
 
