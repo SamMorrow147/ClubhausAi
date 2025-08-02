@@ -143,13 +143,26 @@ export async function POST(req: Request) {
     const userId = 'anonymous' // In a real app, this would come from authentication
     const sessionId = providedSessionId || `session_${Date.now()}`
     
-    // Extract user information from the message
+    // Extract user information from the message - but be more conservative about names
     const extractedInfo = userProfileService.extractUserInfoFromMessage(lastMessage.content)
     
-    // Update user profile if any info was extracted
+    // Only update profile if we have valid info AND it's not just a question word
     if (Object.keys(extractedInfo).length > 0) {
-      console.log('👤 Extracted user info:', extractedInfo)
-      await userProfileService.updateUserProfile(userId, sessionId, extractedInfo)
+      // Additional validation for names - only accept if it's clearly a name
+      if (extractedInfo.name) {
+        const questionWords = ['what', 'why', 'how', 'when', 'where', 'who', 'which']
+        const isQuestionWord = questionWords.includes(extractedInfo.name.toLowerCase())
+        
+        if (isQuestionWord) {
+          console.log('❌ Rejected name extraction - appears to be a question word:', extractedInfo.name)
+          delete extractedInfo.name
+        }
+      }
+      
+      if (Object.keys(extractedInfo).length > 0) {
+        console.log('👤 Extracted user info:', extractedInfo)
+        await userProfileService.updateUserProfile(userId, sessionId, extractedInfo)
+      }
     }
     
     // Log the user message

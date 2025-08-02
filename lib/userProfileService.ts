@@ -141,19 +141,18 @@ export class UserProfileService {
       extracted.phone = phoneMatch[0]
     }
 
-    // Extract name - this is trickier, look for patterns like "I'm John" or "My name is John"
+    // Extract name - ONLY from explicit name patterns, not from random capitalized words
     const namePatterns = [
       /(?:my name is|i'm|i am|call me|this is)\s+([a-zA-Z]+(?:\s+[a-zA-Z]+)?)/i,
-      /^([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)(?:\s|$)/,  // Name at start of message
     ]
     
     for (const pattern of namePatterns) {
       const nameMatch = message.match(pattern)
       if (nameMatch && nameMatch[1]) {
         const possibleName = nameMatch[1].trim()
-        // Basic validation - avoid common false positives
+        // Enhanced validation - avoid common false positives including question words
         if (possibleName.length > 1 && possibleName.length < 30 && 
-            !['yes', 'no', 'ok', 'sure', 'thanks', 'hello', 'hi', 'hey'].includes(possibleName.toLowerCase())) {
+            !['yes', 'no', 'ok', 'sure', 'thanks', 'hello', 'hi', 'hey', 'what', 'why', 'how', 'when', 'where', 'who', 'which'].includes(possibleName.toLowerCase())) {
           extracted.name = possibleName
           break
         }
