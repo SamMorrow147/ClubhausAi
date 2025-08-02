@@ -75,13 +75,20 @@ function searchKnowledge(query: string, knowledgeContent: string): string {
     }
   }
   
-  // If no relevant sections found, return the entire knowledge base
+  // If no relevant sections found, return a small subset instead of the entire knowledge base
   if (relevantSections.length === 0) {
-    console.log('⚠️  No relevant sections found, returning all content')
-    return knowledgeContent
+    console.log('⚠️  No relevant sections found, returning core info only')
+    // Return just the basic info sections to reduce token usage
+    const coreSections = sections.filter(section => {
+      const heading = section.match(/^#+\s*(.+)/m)?.[1]?.toLowerCase() || ''
+      return heading.includes('what is clubhaus') || 
+             heading.includes('our services') || 
+             heading.includes('contact info')
+    })
+    return coreSections.slice(0, 2).join('\n\n---\n\n')
   }
   
-  const result = relevantSections.slice(0, 3).join('\n\n---\n\n')
+  const result = relevantSections.slice(0, 2).join('\n\n---\n\n') // Reduced from 3 to 2 sections
   console.log('📝 Returning', relevantSections.length, 'relevant sections')
   return result
 }
@@ -91,6 +98,11 @@ export async function POST(req: Request) {
   const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
   
   try {
+    // Set a timeout for the entire request to prevent hanging
+    const requestTimeout = setTimeout(() => {
+      throw new Error('Request timeout after 25 seconds')
+    }, 25000)
+
     console.log(`🔍 Chat API called [${requestId}]`)
     console.log('🔑 GROQ_API_KEY exists:', !!process.env.GROQ_API_KEY)
     console.log('🔑 GROQ_API_KEY starts with:', process.env.GROQ_API_KEY?.substring(0, 10))
@@ -364,21 +376,45 @@ Acknowledge their request naturally, then ask 1-2 of these questions. Keep it co
       if (!userInfoStatus.hasEmail) missingInfo.push('email')  
       if (!userInfoStatus.hasPhone) missingInfo.push('phone number')
       
+      // Check if this is a new conversation (first or second message)
+      const isNewConversation = messages.length <= 2
+      const shouldAskForContact = messages.length >= 4 && !userInfoStatus.isComplete
+      
+      // Detect if user is being brief/short in responses or giving vague answers
+      const userIsBrief = (lastMessage.content.length < 20 && !lastMessage.content.includes('?')) || 
+                         ['im not sure', 'i dont know', 'not sure', 'idk', 'dunno', 'maybe', 'i guess'].some(phrase => 
+                           lastMessage.content.toLowerCase().includes(phrase))
+      const shouldOfferHuman = userIsBrief && messages.length >= 3
+      
+      console.log('👤 User brief detection:', { 
+        messageLength: lastMessage.content.length, 
+        hasQuestion: lastMessage.content.includes('?'), 
+        userIsBrief, 
+        messageCount: messages.length, 
+        shouldOfferHuman 
+      })
+      
       userInfoGuidance = `
 🎯 USER INFORMATION COLLECTION:
 Missing user info: ${missingInfo.join(', ')}
 
-IMPORTANT: Always try to collect the user's name, email, and phone number early in the conversation. Ask casually and naturally, not all at once unless it makes sense. Be polite and helpful.
+IMPORTANT: Ask for contact information by the 4th-5th message exchange. Keep responses concise and let the user do most of the talking.
 
+${shouldAskForContact ? '🚨 CONTACT TIME: Ask for name and email in this response. This is message #' + messages.length + ' - time to collect contact info.' : ''}
+${shouldOfferHuman ? '🚨 BRIEF USER DETECTED: User is being brief/vague. STOP asking questions and immediately ask: "Can I get your info for the report?"' : ''}
 ${nextInfoToCollect ? `Next to collect: ${nextInfoToCollect}` : ''}
 
 Guidelines:
-- Weave requests for missing information naturally into your responses
-- Don't make it feel like a form - keep it conversational
-- If they're asking for help with a project, you can say something like "I'd love to help with that! What should I call you?" 
-- For email: "What's your email so we can follow up with more details?"
-- For phone: "What's the best number to reach you at?"
-- Once you have all three pieces of information, don't ask again`
+- Keep responses short and focused - don't be verbose
+- Let the user explain their needs - don't guess or answer for them
+- Ask simple, direct questions - don't make assumptions
+- If user is brief/vague after 2-3 exchanges, immediately ask: "Can I get your info for the report?"
+- Ask for name: "Can I get a name to put on the report I'll provide to the rest of the team?"
+- Ask for email: "What's your email so we can send you more details?"
+- Ask for phone: "What's the best number to reach you at?"
+- Be concise and direct - avoid long explanations
+- Once you have all three pieces of information, don't ask again
+- If user is vague, ask simple follow-up questions instead of guessing`
     }
 
     const systemPrompt = `You are the Clubhaus AI assistant. You represent a creative agency that values sharp thinking, curiosity, and clarity.
@@ -387,6 +423,10 @@ Guidelines:
 - Only say "Welcome to the club" on the first message in a new conversation. Don't repeat it after that — it gets awkward.
 - Speak naturally, like a helpful creative strategist
 - Be short, smart, and human — not robotic or overly polished
+- Keep responses concise and focused - avoid being verbose
+- Let the user do most of the talking - don't guess or answer for them
+- Ask simple, direct questions rather than making assumptions
+- When users are vague or say "I'm not sure", ask for contact info instead of more questions
 - Show curiosity about the user's business before offering solutions
 - Speak in a curious, helpful tone — especially when users are sharing info about their own projects
 - Ask thoughtful follow-up questions when users mention they need help (e.g. with logos, websites, SEO)
@@ -394,13 +434,18 @@ Guidelines:
 - Use casual first-person phrasing like "I can help with that," "Happy to explain," etc.
 - Avoid forced or gimmicky phrases like "you're part of the club" or similar themed taglines
 - Use natural, conversational intros like "Hey there — how can I help?" or "What are you working on?"
+- Establish value and understand needs before asking for contact information
+- Stay relevant to what the user is actually asking about - don't bring up unrelated topics
+- If user is brief/vague after 2-3 exchanges, STOP asking questions and offer to connect with a human strategist
+- Focus on collecting information, not making suggestions or recommendations
 
 🎯 Strategic Response Guidelines:
 1. **Prioritize flagship projects** - After high-impact work like X Games, lead with other flagship projects (Twisted Pin, Blasted Ink, Experience Maple Grove)
-2. **Connect cultural threads** - If someone mentions skateboards and tattoos, lean into that crossover: "Skateboards and tattoos go hand-in-hand"
+2. **Connect cultural threads** - ONLY if someone explicitly mentions skateboards AND tattoos together, then lean into that crossover: "Skateboards and tattoos go hand-in-hand"
 3. **Portfolio-first approach** - Always offer specific project links over generic responses
-4. **Confident, not cautious** - Don't say "tattoos are a big commitment" - say "tattoos and skateboard design go hand-in-hand"
+4. **Confident, not cautious** - Don't say "tattoos are a big commitment" - say "tattoos and skateboard design go hand-in-hand" ONLY when both are mentioned
 5. **Lead with confidence** - "Definitely. After [previous project], some of our other favorites include..."
+6. **Stay relevant** - Don't mention skateboards or tattoos unless the user brings them up first
 
 🎯 Behavioral Rules:
 1. NEVER say you'll do something you can't actually do.
@@ -411,14 +456,20 @@ Guidelines:
    - Use the knowledge base context to provide accurate information
    - Only say you don't have info if it's truly not available
 
-3. Only talk about Clubhaus services when asked or when clearly relevant.
+3. NEVER make suggestions or recommendations about what the user should do.
+   - ❌ Don't suggest platforms, tools, or solutions
+   - ❌ Don't recommend specific approaches or technologies
+   - ✅ Focus on collecting information about their circumstances and needs
+   - ✅ Ask questions to understand their situation, don't propose solutions
+
+4. Only talk about Clubhaus services when asked or when clearly relevant.
    - Focus more on asking the user about their goals and style.
 
-4. If a user mentions a logo or file:
+5. If a user mentions a logo or file:
    - Ask what file format it is
    - Offer guidance or say: "One of our team members will reach out to collect it."
 
-5. If the user asks for contact info:
+6. If the user asks for contact info:
    - Provide: support@clubhausagency.com
    - Do not make up personal emails or roles unless documented
 
@@ -446,9 +497,13 @@ Use this information to inform your responses, but speak like a sharp, curious c
     console.log('🤖 Building conversation messages...')
     
     // Build conversation messages with system prompt
+    // Limit conversation history to prevent token overflow
+    const maxHistoryMessages = 6 // Keep only last 6 messages (3 exchanges)
+    const limitedMessages = messages.slice(-maxHistoryMessages)
+    
     const conversationMessages = [
       { role: 'system' as const, content: systemPrompt },
-      ...messages.map((msg: any) => ({
+      ...limitedMessages.map((msg: any) => ({
         role: msg.role as 'user' | 'assistant',
         content: msg.content,
       })),
@@ -532,7 +587,7 @@ Use this information to inform your responses, but speak like a sharp, curious c
     }
 
     // Check if this might be a brewery follow-up conversation
-    const breweryKeywords = ['brewery', 'beer', 'brewing', 'omni', 'location', 'bear', 'mascot', 'photo', 'animation', 'interaction', 'website', 'site']
+    const breweryKeywords = ['brewery', 'beer', 'brewing', 'omni', 'bear', 'mascot', 'photo', 'animation', 'interaction']
     const hasBreweryKeywords = breweryKeywords.some(keyword => lastMessage.content.toLowerCase().includes(keyword))
     
     // Check if this might be a mural follow-up conversation
@@ -630,8 +685,11 @@ Use this information to inform your responses, but speak like a sharp, curious c
     const finalResponseTime = Date.now() - startTime
 
     // Return the response
+        // Clear the timeout since request completed successfully
+    clearTimeout(requestTimeout)
+    
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         message: aiResponse,
         context: relevantContext.substring(0, 200) + '...',
         debug: { 
@@ -678,9 +736,12 @@ Use this information to inform your responses, but speak like a sharp, curious c
     } else if (error.message?.includes('fetch') || error.message?.includes('network')) {
       errorResponse.error = 'Network error. Please check your connection and try again.'
       errorResponse.debug.errorType = 'NETWORK_ERROR'
-    } else if (error.message?.includes('timeout')) {
+    } else if (error.message?.includes('timeout') || error.code === 'ETIMEDOUT') {
       errorResponse.error = 'Request timed out. Please try again.'
       errorResponse.debug.errorType = 'TIMEOUT_ERROR'
+    } else if (error.code === 'ETIMEDOUT' || error.message?.includes('ETIMEDOUT')) {
+      errorResponse.error = 'Connection timed out. Please try again.'
+      errorResponse.debug.errorType = 'CONNECTION_TIMEOUT'
     }
 
     return new Response(

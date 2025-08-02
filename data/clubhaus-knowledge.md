@@ -1,4 +1,4 @@
-# Clubman – Internal Knowledge Base
+# Clubhaus Ai – Internal Knowledge Base
 
 Welcome to the Clubhaus AI knowledge base. This file powers the AI concierge and should be the source of truth for all answers.
 
@@ -22,7 +22,6 @@ We build authentic, visually strategic brands:
 ### Web Design & Development
 We create conversion-focused, mobile-first websites:
 - WordPress
-- Webflow
 - React (Next.js)
 - Custom components, animations, AI-integrated UIs
 
@@ -42,7 +41,7 @@ We're not just visual — we think in systems:
 
 ### Packaging & Print
 We design things you can hold:
-- Product packaging
+- Product packaging (including large-scale packaging redesigns like Fiocchi Ammunition's 1,000+ package designs)
 - Menu systems
 - Collateral & signage
 - Print production support
@@ -117,6 +116,7 @@ These are our highest-impact, most conversation-worthy projects:
 - **Experience Maple Grove**: Year-round creative and digital marketing for city tourism, including Restaurant Week and Winter Fest. Shows our ability to handle large-scale, multi-platform campaigns.
 
 ### Other Notable Projects
+- **Fiocchi Ammunition**: Sam rebranded this Italian ammunition company and recreated over 1,000 package designs, impacting packaging internationally for the brand.
 - **Omni Brewing**: Complete web redesign and brand messaging overhaul. Built to highlight handcrafted community-driven products.
 - **Lake Byllesby Pavilion Mural**: Ceiling mural installation blending architectural storytelling and nature themes.
 - **GC Hockey**: AI-powered website rebuild with interactive navigation and LLM-integrated concierge.
@@ -154,7 +154,7 @@ We're based in Uptown Minneapolis. We're more of a group of digital nomads — w
 ## ❓ Sample FAQs (for matching queries)
 
 ### Do you offer support plans?
-Yes, we offer ongoing WordPress and Webflow support including updates, backups, and monthly optimization.
+Yes, we offer ongoing WordPress support including updates, backups, and monthly optimization.
 
 ### Can you build custom AI tools?
 Yes. We create chatbots, customer service tools, and internal dashboards using GPT, Groq, and vector search systems like the one you're using now.

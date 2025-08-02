@@ -31,11 +31,10 @@ export function shouldShareBreweryDetail(
   const interestIndicators = [
     'tell me more', 'more details', 'what else', 'interesting', 'cool', 'nice',
     'sounds good', 'that sounds', 'impressive', 'awesome', 'great', 'love that',
-    'location', 'locations', 'maple grove', 'rosemount', 'victoria',
     'bear', 'mascot', 'animation', 'animations',
     'photo', 'photography', 'pictures', 'images', 'visual',
     'interaction', 'interactions', 'animation', 'hover', 'fun',
-    'website', 'site', 'link', 'url', 'check it out', 'see it'
+    'link', 'url', 'check it out', 'see it'
   ];
   
   const hasInterest = interestIndicators.some(indicator => messageLower.includes(indicator));
