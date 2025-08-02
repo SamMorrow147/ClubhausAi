@@ -1,66 +1,49 @@
-# 🏢 Clubman
+# CH Bot
 
-A full-featured local RAG (Retrieval-Augmented Generation) chatbot built with Next.js, TypeScript, and the Vercel AI SDK. This AI assistant provides information about Clubhaus co-working space facilities, memberships, policies, and services.
+A Next.js-based AI chatbot for Clubhaus Agency, built with Groq's LLM API.
 
-## 🚀 Features
+## Features
 
-- **RAG System**: Retrieval-Augmented Generation using local markdown knowledge base
-- **Vector Similarity Search**: Cosine similarity search for relevant information retrieval
-- **Persistent Memory**: Long-term conversation memory using Mem0 AI
-- **Streaming Responses**: Real-time streaming chat powered by Groq's fast inference
-- **Modern UI**: Clean, responsive chat interface with Tailwind CSS
-- **TypeScript**: Full type safety throughout the application
-- **Local Knowledge Base**: Easy to update markdown-based knowledge management
+- **AI Chat Interface**: Powered by Groq's Llama 3.1 8B Instant model
+- **Knowledge Base Integration**: RAG (Retrieval-Augmented Generation) with Clubhaus-specific content
+- **User Profile Management**: Collects and manages user information
+- **Strategic Responses**: Pre-configured responses for common scenarios
+- **Token Usage Tracking**: Monitors API usage and costs
+- **Memory Management**: Persistent conversation history
+- **Rate Limiting Protection**: Automatic retry mechanism for Groq API throttling
 
-## 🛠️ Tech Stack
+## Groq API Retry Mechanism
 
-- **Framework**: Next.js 14 with TypeScript
-- **AI SDK**: Vercel AI SDK v3.0+
-- **LLM Provider**: Groq (Llama 3.3 70B)
-- **Memory Layer**: Mem0 AI for persistent conversation memory
-- **Embeddings**: OpenAI text-embedding-ada-002
-- **Vector Search**: In-memory cosine similarity
-- **Styling**: Tailwind CSS (via class names)
-- **Knowledge Base**: Markdown file processing
+The application includes a robust retry mechanism to handle Groq's rate limiting and throttling:
 
-## 📁 Project Structure
+### Features
+- **Exponential Backoff**: Starts at 1 second, doubles each retry (max 10 seconds)
+- **Jitter**: Adds random variation to prevent thundering herd problems
+- **Smart Error Detection**: Identifies retryable vs non-retryable errors
+- **User-Friendly Messages**: Clear error messages for rate limiting scenarios
 
-```
-├── data/
-│   ├── clubhaus-knowledge.md    # Main knowledge base content
-│   ├── twisted-pin.md          # Twisted Pin project case study
-│   ├── project-triggers.json   # Project trigger conditions
-│   └── projects-index.json     # Project metadata and organization
-├── lib/
-│   ├── embeddings.ts           # Embedding generation & knowledge loading
-│   ├── rag.ts                  # Vector search & retrieval
-│   └── projectHandler.ts       # Project trigger management
-├── app/
-│   ├── api/
-│   │   ├── chat/
-│   │   │   └── route.ts       # Chat API endpoint
-│   │   └── test/
-│   │       └── route.ts       # Test endpoint
-│   ├── layout.tsx             # App layout
-│   └── page.tsx               # Main page
-├── components/
-│   ├── chat-interface.tsx     # Chat UI component
-│   └── ui/
-│       └── button.tsx         # UI components
-└── README.md
+### Configuration
+```typescript
+const GROQ_RETRY_CONFIG = {
+  maxRetries: 3,        // Maximum retry attempts
+  baseDelay: 1000,      // Initial delay (1 second)
+  maxDelay: 10000,      // Maximum delay (10 seconds)
+  jitter: 0.1,          // 10% random variation
+}
 ```
 
-### Project Reference System
+### Error Handling
+- **429 Status Codes**: Rate limiting errors
+- **Groq-specific messages**: "rate limit", "throttle", "too many requests", "quota exceeded"
+- **Server errors (5xx)**: Temporary server issues
+- **Network errors**: Connection issues
 
-The bot uses a structured approach for managing project references:
+### User Experience
+When rate limiting occurs, users receive friendly messages like:
+- "The service is temporarily busy. Please wait a moment and try again."
+- "Service capacity reached. Please try again in a moment."
 
-- **Context Files** (`data/*.md`) - Detailed project information and case studies
-- **Trigger Scripts** (`data/project-triggers.json`) - When to reference specific projects
-- **Metadata Index** (`data/projects-index.json`) - Project organization and categorization
-
-See [PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md) for detailed documentation on adding new projects.
-
-## 🔧 Setup Instructions
+## Setup
 
 ### 1. Prerequisites
 

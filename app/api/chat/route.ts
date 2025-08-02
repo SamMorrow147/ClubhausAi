@@ -93,6 +93,8 @@ function searchKnowledge(query: string, knowledgeContent: string): string {
   return result
 }
 
+import { callGroqWithRetry, getRateLimitErrorMessage } from '../../../lib/groqRetry'
+
 export async function POST(req: Request) {
   const startTime = Date.now()
   const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
@@ -524,50 +526,13 @@ Use this information to inform your responses, but speak like a sharp, curious c
 
     console.log('🤖 Calling Groq API with', conversationMessages.length, 'messages...')
 
-    // Get the response using the Groq API directly
-    const groqStartTime = Date.now()
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'llama-3.1-8b-instant',
-        messages: conversationMessages,
-        temperature: 0.7,
-        max_tokens: 500,
-      }),
-    })
-
-    const groqResponseTime = Date.now() - groqStartTime
-    console.log(`⏱️ Groq API response time: ${groqResponseTime}ms`)
-
-    if (!response.ok) {
-      const errorData = await response.json()
-      console.error('❌ Groq API error:', errorData)
-      console.error('❌ Response status:', response.status)
-      console.error('❌ Response headers:', Object.fromEntries(response.headers.entries()))
-      
-      // Enhanced error logging
-      const errorInfo = {
-        requestId,
-        errorType: 'GROQ_API_ERROR',
-        status: response.status,
-        statusText: response.statusText,
-        errorData,
-        groqResponseTime,
-        totalTime: Date.now() - startTime,
-        userMessage: lastMessage.content.substring(0, 100) + '...',
-        messageCount: messages.length
-      }
-      
-      console.error('❌ Detailed error info:', errorInfo)
-      
-      throw new Error(`Groq API error: ${errorData.error?.message || 'Unknown error'} (Status: ${response.status})`)
-    }
-
-    const data = await response.json()
+    // Get the response using the Groq API with retry mechanism
+    const { data, responseTime: groqResponseTime } = await callGroqWithRetry(
+      conversationMessages,
+      requestId,
+      startTime
+    )
+    
     let aiResponse = data.choices[0]?.message?.content || 'Sorry, I could not generate a response.'
 
     console.log('✅ Got response from Groq')
@@ -746,6 +711,10 @@ Use this information to inform your responses, but speak like a sharp, curious c
     if (error.message?.includes('API key') || error.message?.includes('401')) {
       errorResponse.error = 'API configuration error. Please check your GROQ_API_KEY.'
       errorResponse.debug.errorType = 'API_CONFIG_ERROR'
+    } else if (error.message?.includes('rate limit') || error.message?.includes('throttle') || error.message?.includes('429') || 
+               error.message?.includes('quota exceeded') || error.message?.includes('too many requests')) {
+      errorResponse.error = getRateLimitErrorMessage(error)
+      errorResponse.debug.errorType = 'RATE_LIMIT_ERROR'
     } else if (error.message?.includes('fetch') || error.message?.includes('network')) {
       errorResponse.error = 'Network error. Please check your connection and try again.'
       errorResponse.debug.errorType = 'NETWORK_ERROR'
