@@ -5,11 +5,45 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { MessageCircle, Send, Loader2, ExternalLink } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
+import { TypeAnimation } from 'react-type-animation'
 
 interface Message {
   id: string
   role: 'user' | 'assistant'
   content: string
+}
+
+// Component to handle typing animation for bot messages
+interface TypedBotMessageProps {
+  content: string
+  isLightMode: boolean
+  onComplete?: () => void
+  LinkComponent: React.ComponentType<React.AnchorHTMLAttributes<HTMLAnchorElement>>
+  convertUrlsToMarkdown: (text: string) => string
+}
+
+function TypedBotMessage({ content, isLightMode, onComplete, LinkComponent, convertUrlsToMarkdown }: TypedBotMessageProps) {
+  const handleTypingComplete = () => {
+    onComplete?.()
+  }
+
+  // ONLY use TypeAnimation - NEVER switch to anything else
+  return (
+    <div className="max-w-none">
+      <TypeAnimation
+        sequence={[content, handleTypingComplete]}
+        wrapper="div"
+        speed={75}
+        style={{ 
+          whiteSpace: 'pre-wrap',
+          color: 'inherit',
+          fontSize: 'inherit',
+          fontFamily: 'inherit'
+        }}
+        cursor={false}
+      />
+    </div>
+  )
 }
 
 export function ChatInterface() {
@@ -24,19 +58,11 @@ export function ChatInterface() {
   
   // State for transforming loading message
   const [loadingMessageId, setLoadingMessageId] = useState<string | null>(null)
-  const [isTransforming, setIsTransforming] = useState(false)
-  
-  // Animation states for first message
-  const [isAnimatingFirstMessage, setIsAnimatingFirstMessage] = useState(false)
-  const [animatingMessageText, setAnimatingMessageText] = useState('')
-  const [showStaticMessages, setShowStaticMessages] = useState(false)
   
   // Reset animation states when starting fresh
   useEffect(() => {
     if (messages.length === 0) {
-      setIsAnimatingFirstMessage(false)
-      setAnimatingMessageText('')
-      setShowStaticMessages(false)
+      setHasFirstMessage(false)
     }
   }, [messages.length])
 
@@ -87,9 +113,9 @@ export function ChatInterface() {
   useEffect(() => {
     const messagesContainer = document.querySelector('.messages-container') as HTMLElement
     if (messagesContainer) {
-      // Simple, direct scroll to bottom - no conflicts
+      // Simple, direct scroll to bottom with a small buffer to ensure full visibility
       setTimeout(() => {
-        messagesContainer.scrollTop = messagesContainer.scrollHeight
+        messagesContainer.scrollTop = messagesContainer.scrollHeight + 50
       }, 100)
     }
   }, [messages])
@@ -167,32 +193,14 @@ export function ChatInterface() {
 
     // Handle first message animation
     if (messages.length === 0) {
-      setAnimatingMessageText(messageText)
-      setIsAnimatingFirstMessage(true)
-      setShowStaticMessages(false)
+      // Simplified first message animation - no complex morphing
+      setHasFirstMessage(true)
       
-      // Trigger GIF animation
+      // Add both messages with a simple delay to avoid layout shifts
       setTimeout(() => {
-        setHasFirstMessage(true)
-      }, 50)
-      
-      // Add user message first
-      setTimeout(() => {
-        setMessages(prev => [...prev, userMessage])
-      }, 700)
-      
-      // Show static message and hide animation simultaneously
-      setTimeout(() => {
-        setShowStaticMessages(true)
-        setIsAnimatingFirstMessage(false)
-        setAnimatingMessageText('')
-      }, 800) // Complete everything at once to prevent glitches
-      
-      // Add loading message after animation completes
-      setTimeout(() => {
-        setMessages(prev => [...prev, loadingMessage])
+        setMessages(prev => [...prev, userMessage, loadingMessage])
         setLoadingMessageId(loadingId)
-      }, 900)
+      }, 400) // Single, shorter delay
     } else {
       // For subsequent messages, add both in correct order
       setMessages(prev => [...prev, userMessage, loadingMessage])
@@ -223,17 +231,13 @@ export function ChatInterface() {
 
       const data = await response.json()
       
-      // Transform the loading message into the response
-      setIsTransforming(true)
-      setTimeout(() => {
-        setMessages(prev => prev.map(msg => 
-          msg.id === loadingId 
-            ? { ...msg, content: data.message }
-            : msg
-        ))
-        setIsTransforming(false)
-        setLoadingMessageId(null)
-      }, 300) // Small delay for smooth transition
+      // Transform the loading message into the response INSTANTLY
+      setMessages(prev => prev.map(msg => 
+        msg.id === loadingId 
+          ? { ...msg, content: data.message }
+          : msg
+      ))
+      setLoadingMessageId(null)
 
     } catch (error) {
       console.error('Chat error:', error)
@@ -273,32 +277,14 @@ export function ChatInterface() {
 
     // Handle first message animation for quick questions
     if (messages.length === 0) {
-      setAnimatingMessageText(question)
-      setIsAnimatingFirstMessage(true)
-      setShowStaticMessages(false)
+      // Simplified first message animation - no complex morphing
+      setHasFirstMessage(true)
       
-      // Trigger GIF animation
+      // Add both messages with a simple delay to avoid layout shifts
       setTimeout(() => {
-        setHasFirstMessage(true)
-      }, 50)
-      
-      // Add user message first
-      setTimeout(() => {
-        setMessages(prev => [...prev, userMessage])
-      }, 700)
-      
-      // Show static message and hide animation simultaneously
-      setTimeout(() => {
-        setShowStaticMessages(true)
-        setIsAnimatingFirstMessage(false)
-        setAnimatingMessageText('')
-      }, 800) // Complete everything at once to prevent glitches
-      
-      // Add loading message after animation completes
-      setTimeout(() => {
-        setMessages(prev => [...prev, loadingMessage])
+        setMessages(prev => [...prev, userMessage, loadingMessage])
         setLoadingMessageId(loadingId)
-      }, 900)
+      }, 400) // Single, shorter delay
     } else {
       // For subsequent messages, add both in correct order
       setMessages(prev => [...prev, userMessage, loadingMessage])
@@ -329,17 +315,13 @@ export function ChatInterface() {
 
       const data = await response.json()
       
-      // Transform the loading message into the response
-      setIsTransforming(true)
-      setTimeout(() => {
-        setMessages(prev => prev.map(msg => 
-          msg.id === loadingId 
-            ? { ...msg, content: data.message }
-            : msg
-        ))
-        setIsTransforming(false)
-        setLoadingMessageId(null)
-      }, 300) // Small delay for smooth transition
+      // Transform the loading message into the response INSTANTLY
+      setMessages(prev => prev.map(msg => 
+        msg.id === loadingId 
+          ? { ...msg, content: data.message }
+          : msg
+      ))
+      setLoadingMessageId(null)
 
     } catch (error) {
       console.error('Chat error:', error)
@@ -447,16 +429,16 @@ export function ChatInterface() {
           </svg>
           
           <div className="content" style={{ zIndex: 50 }}>
-            {/* Animated GIF with Framer Motion - Independent of welcome screen */}
+            {/* Animated GIF with Framer Motion - Simplified */}
             <AnimatePresence>
-              {(messages.length === 0 || hasFirstMessage || isAnimatingFirstMessage) && (
+              {(messages.length === 0 || hasFirstMessage) && (
                 <motion.div 
                   ref={initialGifRef}
                   className="relative"
                   style={{ 
-                    zIndex: isAnimatingFirstMessage ? 400 : 100,
-                    opacity: 1, // Force visibility
-                    pointerEvents: 'none' // Don't interfere with other elements
+                    zIndex: 100,
+                    opacity: 1,
+                    pointerEvents: 'none'
                   }}
                   initial={messages.length === 0 ? {
                     width: '8rem',
@@ -464,8 +446,7 @@ export function ChatInterface() {
                     margin: '0 auto 1rem',
                     position: 'relative',
                     opacity: 0,
-                    scale: 0.8,
-                    y: 20
+                    scale: 0.9
                   } : false}
                   animate={hasFirstMessage ? {
                     position: 'fixed',
@@ -474,171 +455,33 @@ export function ChatInterface() {
                     width: '3rem',
                     height: '3rem',
                     margin: 0,
-                    zIndex: 50,
-                    scale: [1, 1.05, 1],
-                    rotate: [0, 2, -2, 0],
-                    opacity: 1
+                    opacity: 1,
+                    scale: 1
                   } : {
                     width: '8rem',
                     height: '8rem',
                     margin: '0 auto 1rem',
                     position: 'relative',
-                    opacity: 1, // Always visible
-                    scale: 1,
-                    y: 0
+                    opacity: 1,
+                    scale: 1
                   }}
                   transition={{
-                    duration: 2.0,
-                    ease: [0.16, 1, 0.3, 1],
-                    type: "spring",
-                    stiffness: 60,
-                    damping: 25,
-                    scale: {
-                      duration: 0.8,
-                      ease: [0.16, 1, 0.3, 1],
-                      delay: 0.2
-                    },
-                    rotate: {
-                      duration: 1.2,
-                      ease: [0.16, 1, 0.3, 1],
-                      delay: 0.4
-                    },
-                    opacity: {
-                      duration: 0.1, // Very fast opacity change
-                      ease: "easeOut"
-                    }
-                  }}
-                  exit={{
-                    opacity: 0,
-                    scale: 0.8,
-                    y: -20,
-                    transition: {
-                      duration: 1.0,
-                      ease: [0.16, 1, 0.3, 1]
-                    }
+                    duration: 0.6,
+                    ease: [0.25, 0.46, 0.45, 0.94]
                   }}
                 >
-                  {/* Blurred background layer for flow effect */}
+                  {/* Single GIF layer - no blur effects */}
                   <motion.img 
                     src="/gifs/Small-Transparent-messeger-app-Chip.gif" 
                     alt="Clubhaus AI Assistant" 
-                    className="w-full h-full object-contain absolute inset-0 blur-sm opacity-60 scale-110"
-                    animate={{ opacity: 0.6 }}
-                    transition={{
-                      duration: 1.5,
-                      ease: [0.16, 1, 0.3, 1]
-                    }}
-                  />
-                  {/* Main GIF layer */}
-                  <motion.img 
-                    src="/gifs/Small-Transparent-messeger-app-Chip.gif" 
-                    alt="Clubhaus AI Assistant" 
-                    className="w-full h-full object-contain relative"
-                    style={{ zIndex: 150 }}
+                    className="w-full h-full object-contain"
                     whileHover={{ scale: 1.05 }}
-                    animate={hasFirstMessage ? {
-                      scale: [1, 1.01, 1],
-                      transition: {
-                        duration: 3,
-                        repeat: Infinity,
-                        ease: "easeInOut"
-                      }
-                    } : {}}
                     transition={{
                       type: "spring",
                       stiffness: 300,
-                      damping: 15
+                      damping: 20
                     }}
                   />
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-                        {/* Animating First Message */}
-            <AnimatePresence>
-              {isAnimatingFirstMessage && animatingMessageText && (
-                <motion.div
-                  className="absolute inset-0 pointer-events-none"
-                  style={{ zIndex: 300 }}
-                  initial={{
-                    opacity: 1,
-                  }}
-                  exit={{
-                    opacity: 0,
-                    transition: { duration: 0.2 }
-                  }}
-                >
-                  <motion.div
-                    className="flex justify-end absolute"
-                    style={{ 
-                      right: '2rem', // Match messages-list padding (1rem) + message margin
-                      left: '2rem',
-                      top: '8rem' // Position within the content area to align with messages
-                    }}
-                    initial={{
-                      y: 280, // Start from input position
-                      x: 0,
-                      scale: 1,
-                      opacity: 1
-                    }}
-                    animate={{
-                      y: -112, // Move from 8rem (128px) to 1rem (16px) = -112px
-                      x: 0,
-                      scale: 1,
-                      opacity: 1
-                    }}
-                    transition={{
-                      duration: 0.8,
-                      ease: [0.25, 0.46, 0.45, 0.94],
-                      type: "spring",
-                      stiffness: 120,
-                      damping: 18
-                    }}
-                  >
-                    <motion.div
-                      className={`max-w-xs lg:max-w-2xl px-4 py-3 rounded-lg overflow-hidden ${
-                        isLightMode 
-                          ? 'bg-blue-900/20 text-blue-900 border border-blue-900/30'
-                          : 'bg-white/20 text-white border border-white/30'
-                      }`}
-                                             initial={{
-                         width: 0,
-                         height: 0,
-                         borderRadius: "50%",
-                         paddingLeft: 0,
-                         paddingRight: 0,
-                         paddingTop: 0,
-                         paddingBottom: 0
-                       }}
-                       animate={{
-                         width: "auto",
-                         height: "auto", 
-                         borderRadius: "0.5rem",
-                         paddingLeft: "1rem",
-                         paddingRight: "1rem",
-                         paddingTop: "0.75rem",
-                         paddingBottom: "0.75rem"
-                       }}
-                       transition={{
-                         duration: 0.5,
-                         delay: 0.2,
-                         ease: [0.25, 0.46, 0.45, 0.94]
-                       }}
-                    >
-                                             <motion.p
-                         className="whitespace-pre-wrap"
-                         initial={{ opacity: 0, scale: 0.98 }}
-                         animate={{ opacity: 1, scale: 1 }}
-                         transition={{
-                           duration: 0.3,
-                           delay: 0.4,
-                           ease: "easeOut"
-                         }}
-                       >
-                         {animatingMessageText}
-                       </motion.p>
-                    </motion.div>
-                  </motion.div>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -649,46 +492,29 @@ export function ChatInterface() {
                   className="text-center py-8" 
                   style={{ paddingTop: '9rem' }}
                   animate={{
-                    opacity: isAnimatingFirstMessage ? 0 : 1
+                    opacity: hasFirstMessage ? 0 : 1,
+                    y: hasFirstMessage ? -20 : 0
                   }}
                   transition={{
-                    duration: 0.2,
+                    duration: 0.4,
                     ease: "easeOut"
                   }}
                 >
-
                   <motion.p 
                     className={`mb-6 ${isLightMode ? 'text-blue-900/80' : 'text-white/80'}`}
-                    animate={{
-                      opacity: isAnimatingFirstMessage ? 0 : 1,
-                      y: isAnimatingFirstMessage ? -20 : 0
-                    }}
-                    transition={{
-                      duration: 0.3,
-                      ease: "easeOut"
-                    }}
                   >
                     A Clubhaus AI built to talk with you about your project or our business. Whether you're here to build something bold or just exploring, I'm here to help.
                   </motion.p>
                   
-
                   <motion.div 
                     className="hidden md:grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg mx-auto"
-                    animate={{
-                      opacity: isAnimatingFirstMessage ? 0 : 1,
-                      y: isAnimatingFirstMessage ? -10 : 0
-                    }}
-                    transition={{
-                      duration: 0.25,
-                      ease: "easeOut"
-                    }}
                   >
                     {quickQuestions.map((question, index) => (
                       <Button
                         key={index}
                         variant="outline"
                         onClick={() => handleQuickQuestion(question)}
-                        disabled={isAnimatingFirstMessage}
+                        disabled={hasFirstMessage}
                         className={`text-left p-3 h-auto text-sm justify-start bg-transparent transition-all duration-200 ${
                           isLightMode 
                             ? 'border-blue-900/20 text-blue-900/80 hover:bg-blue-900/10 hover:text-blue-900/90 hover:border-blue-900/40 hover:shadow-[0_0_5px_rgba(59,130,246,0.2)]'
@@ -707,25 +533,18 @@ export function ChatInterface() {
                       <motion.div
                         key={message.id}
                         className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                        initial={index === 0 && !showStaticMessages ? {
-                          opacity: 0,
-                          y: 10
-                        } : false}
-                        animate={{
-                          opacity: index === 0 && !showStaticMessages ? 0 : 1,
-                          y: 0
-                        }}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
                         transition={{
                           duration: 0.3,
-                          delay: index === 0 && showStaticMessages ? 0 : index * 0.1,
+                          delay: index * 0.1,
                           ease: "easeOut"
-                        }}
-                        style={{
-                          visibility: index === 0 && !showStaticMessages ? 'hidden' : 'visible'
                         }}
                       >
                         <motion.div
-                          className={`max-w-xs lg:max-w-2xl rounded-lg transition-all duration-500 ${
+                          className={`max-w-xs lg:max-w-2xl rounded-lg ${
+                            message.role === 'assistant' ? '' : 'transition-all duration-500'
+                          } ${
                             message.content === 'loading'
                               ? 'processing-message-box'
                               : message.role === 'user'
@@ -736,18 +555,18 @@ export function ChatInterface() {
                                   ? 'bg-blue-900/10 text-blue-900/90 border border-blue-900/20 px-4 py-3'
                                   : 'bg-white/10 text-white/90 border border-white/20 px-4 py-3'
                           }`}
-                          initial={message.id === loadingMessageId && message.content !== 'loading' ? { 
+                          initial={message.id === loadingMessageId && message.content !== 'loading' && message.role === 'user' ? { 
                             opacity: 0, 
                             scale: 0.98
                           } : false}
-                          animate={{ 
+                          animate={message.role === 'assistant' ? false : { 
                             opacity: 1, 
                             scale: 1
                           }}
-                          transition={{
+                          transition={message.role === 'assistant' ? { duration: 0 } : {
                             duration: 0.5,
                             ease: "easeOut",
-                            delay: message.id === loadingMessageId && message.content !== 'loading' ? 0.3 : 0
+                            delay: message.id === loadingMessageId && message.content !== 'loading' && message.role === 'user' ? 0.3 : 0
                           }}
                         >
                           {message.content === 'loading' ? (
@@ -760,12 +579,31 @@ export function ChatInterface() {
                                 ? 'hsl(260, 25%, 95%)' 
                                 : 'hsl(222.2, 84%, 4.9%)'
                             }}>
-                              <div className="flex items-center justify-center">
-                                <span className={`text-sm ${
-                                  isLightMode ? 'text-blue-900/70' : 'text-white/70'
-                                }`}>Strategizing...</span>
+                              <div className="max-w-none">
+                                <span style={{ 
+                                  whiteSpace: 'pre-wrap',
+                                  color: isLightMode ? '#1e3a8a' : '#ffffff',
+                                  fontSize: 'inherit',
+                                  fontFamily: 'inherit',
+                                  fontWeight: '500',
+                                  position: 'relative',
+                                  zIndex: 10
+                                }}>Strategizing...</span>
                               </div>
                             </div>
+                          ) : message.role === 'assistant' ? (
+                            <TypedBotMessage
+                              content={message.content}
+                              isLightMode={isLightMode}
+                              onComplete={() => {
+                                // This onComplete is for the TypedBotMessage component itself,
+                                // not the overall message animation.
+                                // The overall message animation is handled by the AnimatePresence
+                                // and the message's own transition.
+                              }}
+                              LinkComponent={LinkComponent}
+                              convertUrlsToMarkdown={convertUrlsToMarkdown}
+                            />
                           ) : (
                             <div className="max-w-none">
                               <ReactMarkdown components={{ a: LinkComponent }}>{convertUrlsToMarkdown(message.content)}</ReactMarkdown>
