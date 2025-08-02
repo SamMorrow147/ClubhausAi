@@ -156,12 +156,24 @@ export async function POST(req: Request) {
     const projectTrigger = checkProjectTriggers(lastMessage.content)
     if (projectTrigger) {
       console.log('🎯 Found project trigger for:', projectTrigger.name)
+      
+      // Ensure minimum 1-second delay for strategizing bubble
+      const currentTime = Date.now()
+      const elapsedTime = currentTime - startTime
+      const minimumDelayMs = 1000 // 1 second
+      
+      if (elapsedTime < minimumDelayMs) {
+        const remainingDelay = minimumDelayMs - elapsedTime
+        console.log(`⏳ Adding ${remainingDelay}ms delay to ensure minimum 1-second strategizing time`)
+        await new Promise(resolve => setTimeout(resolve, remainingDelay))
+      }
+      
       return new Response(
         JSON.stringify({ 
           message: projectTrigger.response.text,
           context: `Project trigger: ${projectTrigger.name}`,
           projectTrigger: projectTrigger,
-          debug: { requestId, responseType: 'PROJECT_TRIGGER' }
+          debug: { requestId, responseType: 'PROJECT_TRIGGER', responseTime: Date.now() - startTime }
         }),
         { 
           status: 200, 
@@ -209,12 +221,23 @@ export async function POST(req: Request) {
           finalResponse += `\n\n${breweryDetail}`
         }
         
+        // Ensure minimum 1-second delay for strategizing bubble
+        const currentTime = Date.now()
+        const elapsedTime = currentTime - startTime
+        const minimumDelayMs = 1000 // 1 second
+        
+        if (elapsedTime < minimumDelayMs) {
+          const remainingDelay = minimumDelayMs - elapsedTime
+          console.log(`⏳ Adding ${remainingDelay}ms delay to ensure minimum 1-second strategizing time`)
+          await new Promise(resolve => setTimeout(resolve, remainingDelay))
+        }
+        
         return new Response(
           JSON.stringify({ 
             message: finalResponse,
             context: 'Brewery strategic response with details',
             breweryState: newState,
-            debug: { requestId, responseType: 'STRATEGIC_BREWERY' }
+            debug: { requestId, responseType: 'STRATEGIC_BREWERY', responseTime: Date.now() - startTime }
           }),
           { 
             status: 200, 
@@ -244,12 +267,23 @@ export async function POST(req: Request) {
           finalResponse += `\n\n${muralDetail}`
         }
         
+        // Ensure minimum 1-second delay for strategizing bubble
+        const currentTime = Date.now()
+        const elapsedTime = currentTime - startTime
+        const minimumDelayMs = 1000 // 1 second
+        
+        if (elapsedTime < minimumDelayMs) {
+          const remainingDelay = minimumDelayMs - elapsedTime
+          console.log(`⏳ Adding ${remainingDelay}ms delay to ensure minimum 1-second strategizing time`)
+          await new Promise(resolve => setTimeout(resolve, remainingDelay))
+        }
+        
         return new Response(
           JSON.stringify({ 
             message: finalResponse,
             context: 'Mural strategic response with details',
             muralState: newState,
-            debug: { requestId, responseType: 'STRATEGIC_MURAL' }
+            debug: { requestId, responseType: 'STRATEGIC_MURAL', responseTime: Date.now() - startTime }
           }),
           { 
             status: 200, 
@@ -259,11 +293,23 @@ export async function POST(req: Request) {
       } else {
         // Regular strategic response
         const formattedResponse = formatStrategicResponse(strategicResponse)
+        
+        // Ensure minimum 1-second delay for strategizing bubble
+        const currentTime = Date.now()
+        const elapsedTime = currentTime - startTime
+        const minimumDelayMs = 1000 // 1 second
+        
+        if (elapsedTime < minimumDelayMs) {
+          const remainingDelay = minimumDelayMs - elapsedTime
+          console.log(`⏳ Adding ${remainingDelay}ms delay to ensure minimum 1-second strategizing time`)
+          await new Promise(resolve => setTimeout(resolve, remainingDelay))
+        }
+        
         return new Response(
           JSON.stringify({ 
             message: formattedResponse,
             context: 'Strategic response triggered',
-            debug: { requestId, responseType: 'STRATEGIC' }
+            debug: { requestId, responseType: 'STRATEGIC', responseTime: Date.now() - startTime }
           }),
           { 
             status: 200, 
@@ -570,6 +616,19 @@ Use this information to inform your responses, but speak like a sharp, curious c
       // Don't fail the request if logging fails
     }
 
+    // Ensure minimum 1-second delay for strategizing bubble
+    const currentTime = Date.now()
+    const elapsedTime = currentTime - startTime
+    const minimumDelayMs = 1000 // 1 second
+    
+    if (elapsedTime < minimumDelayMs) {
+      const remainingDelay = minimumDelayMs - elapsedTime
+      console.log(`⏳ Adding ${remainingDelay}ms delay to ensure minimum 1-second strategizing time`)
+      await new Promise(resolve => setTimeout(resolve, remainingDelay))
+    }
+
+    const finalResponseTime = Date.now() - startTime
+
     // Return the response
     return new Response(
       JSON.stringify({ 
@@ -578,7 +637,7 @@ Use this information to inform your responses, but speak like a sharp, curious c
         debug: { 
           requestId, 
           responseType: 'AI_RESPONSE',
-          responseTime: Date.now() - startTime,
+          responseTime: finalResponseTime,
           groqResponseTime
         }
       }),

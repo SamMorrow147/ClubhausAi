@@ -39,6 +39,14 @@ export function ChatInterface() {
       setShowStaticMessages(false)
     }
   }, [messages.length])
+
+  // Add chat-page class to body on mount, remove on unmount
+  useEffect(() => {
+    document.body.classList.add('chat-page')
+    return () => {
+      document.body.classList.remove('chat-page')
+    }
+  }, [])
   
   const cardRef = useRef<HTMLDivElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)

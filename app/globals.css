@@ -370,8 +370,8 @@
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
-  /* Prevent body from scrolling on mobile */
-  body {
+  /* Prevent body from scrolling on mobile - only for chat pages */
+  body.chat-page {
     overflow: hidden;
     position: fixed;
     width: 100%;

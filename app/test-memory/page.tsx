@@ -222,19 +222,19 @@ export default function TestMemoryPage() {
         const lastLog = sortedLogs[sortedLogs.length - 1]
         
         // Extract user profile from the most recent log that has it
+        // Create a copy for reverse iteration to avoid mutating the sorted array
         let userProfile: UserProfile | undefined = undefined
-        for (const log of sortedLogs.reverse()) {
+        const reversedCopy = [...sortedLogs].reverse()
+        for (const log of reversedCopy) {
           if (log.metadata?.userProfile) {
             userProfile = log.metadata.userProfile
             break
           }
         }
-        // Reverse back to maintain chronological order
-        sortedLogs.reverse()
         
         return {
           sessionId,
-          logs: sortedLogs,
+          logs: sortedLogs, // This maintains chronological order (oldest first)
           messageCount: logs.length,
           firstMessage: firstLog.content.substring(0, 50) + (firstLog.content.length > 50 ? '...' : ''),
           lastMessage: lastLog.content.substring(0, 50) + (lastLog.content.length > 50 ? '...' : ''),
