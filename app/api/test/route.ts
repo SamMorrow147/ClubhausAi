@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import TokenUsageService from '../../../lib/tokenUsageService'
 
 export async function GET() {
   const startTime = Date.now()
@@ -10,6 +11,14 @@ export async function GET() {
         exists: !!process.env.GROQ_API_KEY,
         startsWith: process.env.GROQ_API_KEY?.substring(0, 10) || 'N/A',
         length: process.env.GROQ_API_KEY?.length || 0
+      },
+      KV_REST_API_URL: {
+        exists: !!process.env.KV_REST_API_URL,
+        startsWith: process.env.KV_REST_API_URL?.substring(0, 20) || 'N/A'
+      },
+      KV_REST_API_TOKEN: {
+        exists: !!process.env.KV_REST_API_TOKEN,
+        startsWith: process.env.KV_REST_API_TOKEN?.substring(0, 10) || 'N/A'
       },
       NODE_ENV: process.env.NODE_ENV,
       VERCEL_ENV: process.env.VERCEL_ENV,
@@ -67,6 +76,27 @@ export async function GET() {
       groqTest.error = 'No GROQ_API_KEY configured'
     }
 
+    // Test Token Usage Database connection
+    let tokenUsageTest = {
+      success: false,
+      responseTime: 0,
+      error: null as string | null,
+      environment: null as any
+    }
+
+    try {
+      const tokenStartTime = Date.now()
+      const tokenUsageService = TokenUsageService.getInstance()
+      const connectionTest = await tokenUsageService.testConnection()
+      const tokenResponseTime = Date.now() - tokenStartTime
+      
+      tokenUsageTest.success = connectionTest
+      tokenUsageTest.responseTime = tokenResponseTime
+      tokenUsageTest.environment = tokenUsageService.getEnvironmentInfo()
+    } catch (error) {
+      tokenUsageTest.error = error instanceof Error ? error.message : 'Unknown error'
+    }
+
     const totalTime = Date.now() - startTime
 
     return NextResponse.json({
@@ -76,6 +106,7 @@ export async function GET() {
       environment: envChecks,
       fileSystem: fsChecks,
       groqApi: groqTest,
+      tokenUsage: tokenUsageTest,
       system: {
         platform: process.platform,
         nodeVersion: process.version,

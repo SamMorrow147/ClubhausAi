@@ -29,9 +29,9 @@ export const projectPatterns: Record<string, ProjectPattern> = {
   website: {
     triggers: ["need a website", "build a website", "create a website", "website design"],
     questions: [
-      "What platform are you thinking? (WordPress, Squarespace, custom?)",
-      "Who's hosting it?",
-      "What's the main goal for the site?"
+      "What's the main goal for the site?",
+      "Who's your target audience?",
+      "What kind of content or functionality do you need?"
     ]
   },
   branding: {

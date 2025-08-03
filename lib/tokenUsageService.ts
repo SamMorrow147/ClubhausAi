@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'path'
+import { createClient } from 'redis'
 
 export interface TokenUsage {
   id: string
@@ -28,7 +29,8 @@ export class TokenUsageService {
   private logDir: string
   private logFile: string
   private isVercel: boolean
-  private inMemoryUsage: TokenUsage[] = []
+  private redis: any = null
+  private isConnected: boolean = false
 
   private constructor() {
     this.isVercel = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production'
@@ -53,13 +55,87 @@ export class TokenUsageService {
     }
   }
 
-  private readUsage(): TokenUsage[] {
-    // On Vercel, use in-memory storage (resets on deployment)
-    if (this.isVercel) {
-      return this.inMemoryUsage
+  private async getRedisClient() {
+    if (this.redis && this.isConnected) {
+      return this.redis
     }
-    
-    // On local, read from file
+
+    try {
+      // Use Vercel KV environment variables
+      const redis = createClient({
+        url: process.env.KV_REST_API_URL,
+        password: process.env.KV_REST_API_TOKEN,
+      })
+
+      await redis.connect()
+      this.redis = redis
+      this.isConnected = true
+      console.log('✅ Redis client connected for token usage')
+      return redis
+    } catch (error) {
+      console.error('❌ Failed to connect to Redis for token usage:', error)
+      this.isConnected = false
+      return null
+    }
+  }
+
+  private async readUsageFromDatabase(): Promise<TokenUsage[]> {
+    try {
+      const redis = await this.getRedisClient()
+      if (!redis) {
+        console.log('⚠️ Redis not available for token usage, using fallback')
+        return this.readUsageFromFile()
+      }
+
+      const keys = await redis.keys('token_usage:*')
+      const usage: TokenUsage[] = []
+      
+      for (const key of keys) {
+        const data = await redis.get(key)
+        if (data) {
+          const usageEntry = JSON.parse(data) as TokenUsage
+          usage.push(usageEntry)
+        }
+      }
+      
+      return usage.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+    } catch (error) {
+      console.error('❌ Failed to read token usage from database:', error)
+      return this.readUsageFromFile()
+    }
+  }
+
+  private async writeUsageToDatabase(usage: TokenUsage[]): Promise<void> {
+    try {
+      const redis = await this.getRedisClient()
+      if (!redis) {
+        console.log('⚠️ Redis not available for token usage, using fallback')
+        this.writeUsageToFile(usage)
+        return
+      }
+
+      // Clear existing token usage data
+      const keys = await redis.keys('token_usage:*')
+      for (const key of keys) {
+        await redis.del(key)
+      }
+
+      // Write new data
+      for (const entry of usage) {
+        const key = `token_usage:${entry.id}`
+        await redis.set(key, JSON.stringify(entry))
+        // Set expiration for cleanup (90 days)
+        await redis.expire(key, 90 * 24 * 60 * 60)
+      }
+
+      console.log('📊 Token usage data written to database')
+    } catch (error) {
+      console.error('❌ Failed to write token usage to database:', error)
+      this.writeUsageToFile(usage)
+    }
+  }
+
+  private readUsageFromFile(): TokenUsage[] {
     try {
       if (!fs.existsSync(this.logFile)) {
         return []
@@ -67,24 +143,38 @@ export class TokenUsageService {
       const data = fs.readFileSync(this.logFile, 'utf-8')
       return JSON.parse(data)
     } catch (error) {
-      console.error('❌ Failed to read token usage:', error)
+      console.error('❌ Failed to read token usage from file:', error)
       return []
     }
   }
 
-  private writeUsage(usage: TokenUsage[]): void {
-    // On Vercel, store in memory
+  private writeUsageToFile(usage: TokenUsage[]): void {
+    try {
+      fs.writeFileSync(this.logFile, JSON.stringify(usage, null, 2))
+    } catch (error) {
+      console.error('❌ Failed to write token usage to file:', error)
+    }
+  }
+
+  private async readUsage(): Promise<TokenUsage[]> {
+    // On Vercel, use database storage
     if (this.isVercel) {
-      this.inMemoryUsage = usage
+      return await this.readUsageFromDatabase()
+    }
+    
+    // On local, read from file
+    return this.readUsageFromFile()
+  }
+
+  private async writeUsage(usage: TokenUsage[]): Promise<void> {
+    // On Vercel, store in database
+    if (this.isVercel) {
+      await this.writeUsageToDatabase(usage)
       return
     }
     
     // On local, write to file
-    try {
-      fs.writeFileSync(this.logFile, JSON.stringify(usage, null, 2))
-    } catch (error) {
-      console.error('❌ Failed to write token usage:', error)
-    }
+    this.writeUsageToFile(usage)
   }
 
   /**
@@ -116,18 +206,18 @@ export class TokenUsageService {
       }
     }
 
-    const usage = this.readUsage()
+    const usage = await this.readUsage()
     usage.push(usageEntry)
-    this.writeUsage(usage)
+    await this.writeUsage(usage)
 
-    console.log(`📊 Logged ${tokensUsed} ${tokenType} tokens for model ${model} (${this.isVercel ? 'Memory' : 'File'})`)
+    console.log(`📊 Logged ${tokensUsed} ${tokenType} tokens for model ${model} (${this.isVercel ? 'Database' : 'File'})`)
   }
 
   /**
    * Get token usage for a specific date
    */
   async getTokenUsageForDate(date: string): Promise<DailyTokenUsage | null> {
-    const usage = this.readUsage()
+    const usage = await this.readUsage()
     const dateUsage = usage.filter(u => u.date === date)
     
     if (dateUsage.length === 0) {
@@ -204,14 +294,14 @@ export class TokenUsageService {
    * Get all token usage records
    */
   async getAllTokenUsage(): Promise<TokenUsage[]> {
-    return this.readUsage()
+    return await this.readUsage()
   }
 
   /**
    * Reset all token usage data
    */
   async resetAllTokenUsage(): Promise<void> {
-    this.writeUsage([])
+    await this.writeUsage([])
     console.log('🔄 Reset all token usage data')
   }
 
@@ -225,7 +315,7 @@ export class TokenUsageService {
     mostActiveDate: string | null
     daysTracked: number
   }> {
-    const usage = this.readUsage()
+    const usage = await this.readUsage()
     
     if (usage.length === 0) {
       return {
@@ -266,7 +356,97 @@ export class TokenUsageService {
   getEnvironmentInfo(): { isVercel: boolean; storageType: string } {
     return {
       isVercel: this.isVercel,
-      storageType: this.isVercel ? 'in-memory' : 'file-system'
+      storageType: this.isVercel ? 'database' : 'file-system'
+    }
+  }
+
+  /**
+   * Test database connection
+   */
+  async testConnection(): Promise<boolean> {
+    if (!this.isVercel) {
+      return true // File system always works
+    }
+
+    try {
+      const redis = await this.getRedisClient()
+      if (!redis) {
+        return false
+      }
+
+      await redis.set('test_token_usage', 'ok')
+      const result = await redis.get('test_token_usage')
+      await redis.del('test_token_usage')
+      return result === 'ok'
+    } catch (error) {
+      console.error('❌ Token usage database connection test failed:', error)
+      return false
+    }
+  }
+
+  /**
+   * Close Redis connection
+   */
+  async disconnect(): Promise<void> {
+    if (this.redis && this.isConnected) {
+      await this.redis.disconnect()
+      this.isConnected = false
+      console.log('🔌 Token usage Redis client disconnected')
+    }
+  }
+
+  /**
+   * Migrate data from file system to database (for Vercel deployments)
+   */
+  async migrateFromFileToDatabase(): Promise<{ migrated: number; errors: number }> {
+    if (!this.isVercel) {
+      console.log('⚠️ Migration only needed on Vercel')
+      return { migrated: 0, errors: 0 }
+    }
+
+    try {
+      // Read existing data from file
+      const fileData = this.readUsageFromFile()
+      if (fileData.length === 0) {
+        console.log('📊 No file data to migrate')
+        return { migrated: 0, errors: 0 }
+      }
+
+      console.log(`📊 Migrating ${fileData.length} token usage records to database...`)
+
+      // Write to database
+      await this.writeUsageToDatabase(fileData)
+
+      console.log(`✅ Successfully migrated ${fileData.length} records to database`)
+      return { migrated: fileData.length, errors: 0 }
+    } catch (error) {
+      console.error('❌ Failed to migrate token usage data:', error)
+      return { migrated: 0, errors: 1 }
+    }
+  }
+
+  /**
+   * Initialize service and migrate data if needed
+   */
+  async initialize(): Promise<void> {
+    if (this.isVercel) {
+      console.log('🚀 Initializing token usage service for Vercel deployment...')
+      
+      // Test database connection
+      const connectionTest = await this.testConnection()
+      if (connectionTest) {
+        console.log('✅ Database connection successful')
+        
+        // Try to migrate any existing file data
+        const migration = await this.migrateFromFileToDatabase()
+        if (migration.migrated > 0) {
+          console.log(`📊 Migrated ${migration.migrated} records from file to database`)
+        }
+      } else {
+        console.log('⚠️ Database connection failed, will use fallback storage')
+      }
+    } else {
+      console.log('🚀 Initializing token usage service for local development...')
     }
   }
 }

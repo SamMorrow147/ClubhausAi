@@ -3,6 +3,10 @@ import TokenUsageService, { DailyTokenUsage } from '../../../lib/tokenUsageServi
 export async function GET(req: Request) {
   try {
     const tokenUsageService = TokenUsageService.getInstance()
+    
+    // Initialize the service (this will test connection and migrate data if needed)
+    await tokenUsageService.initialize()
+    
     const url = new URL(req.url)
     const action = url.searchParams.get('action') || 'today'
     const days = parseInt(url.searchParams.get('days') || '7')

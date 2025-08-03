@@ -142,6 +142,9 @@ export async function POST(req: Request) {
     const logger = SimpleLogger.getInstance()
     const userProfileService = UserProfileService.getInstance()
     const tokenUsageService = TokenUsageService.getInstance()
+    
+    // Initialize token usage service (this will test connection and migrate data if needed)
+    await tokenUsageService.initialize()
     const userId = 'anonymous' // In a real app, this would come from authentication
     const sessionId = providedSessionId || `session_${Date.now()}`
     
@@ -490,10 +493,10 @@ Guidelines:
 
 🌐 Website Help Protocol:
 When a user says they need help with a website, ask first:
-- What platform is it built on (WordPress, Squarespace, custom)?
-- Who's hosting it?
+- What's not working or what are you hoping to improve?
+- What's the main goal for the site?
 
-Then ask what's not working or what they're hoping to improve.
+Focus on understanding their needs and goals rather than technical implementation details.
 
 Do NOT start by guessing the problem. This will steer you toward better discovery-style questioning and away from canned problem trees.
 
