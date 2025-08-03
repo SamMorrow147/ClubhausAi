@@ -287,7 +287,7 @@ export async function POST(req: Request) {
         !lastMessage.content.toLowerCase().includes('thank you')
       
       if (hasBasicProjectDescription) {
-        const rfpPivotMessage = "Sounds like a great starting point, Stan. If you'd like, I can help you build a proper RFP (Request for Proposal) that outlines your goals, timeline, style preferences, and budget. That way, our team can hit the ground running with ideas tailored to your brand. Want to go through that together now?"
+        const rfpPivotMessage = "Sounds like a great starting point! If you'd like, I can help you build a proper RFP (Request for Proposal) that outlines your goals, timeline, style preferences, and budget. That way, our team can hit the ground running with ideas tailored to your brand. Want to go through that together now?"
         
         // Log the RFP pivot response in background (non-blocking)
         logger.logAIResponse(userId, rfpPivotMessage, {
@@ -475,9 +475,9 @@ export async function POST(req: Request) {
       console.log('🎯 Found strategic response for:', strategicResponse.triggers[0])
       console.log('📝 Strategic response triggered, bypassing RAG')
       
-      // Check if this is an RFP pivot response (basic project description)
-      if (strategicResponse.nextStep === 'rfp_initiated') {
-        console.log('📋 RFP pivot response detected')
+      // Check if this is an RFP pivot response (basic project description) - ONLY on 7th message
+      if (strategicResponse.nextStep === 'rfp_initiated' && isSeventhMessage) {
+        console.log('📋 RFP pivot response detected on 7th message')
         const formattedResponse = formatStrategicResponse(strategicResponse)
         
         return new Response(

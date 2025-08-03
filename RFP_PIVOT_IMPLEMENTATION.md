@@ -15,7 +15,7 @@ This implementation adds a natural and friendly response that pivots users from 
 - **Location**: `app/api/chat/route.ts`
 - **Trigger**: 7th bot message in conversation
 - **Condition**: User provides basic project description (not already in RFP flow)
-- **Response**: "Sounds like a great starting point, Stan. If you'd like, I can help you build a proper RFP..."
+- **Response**: "Sounds like a great starting point! If you'd like, I can help you build a proper RFP..."
 
 ### 3. Follow-up Logic for Yes/No Responses
 - **Yes Response**: Starts RFP flow with "What's the name of your business?"
@@ -42,7 +42,7 @@ This implementation adds a natural and friendly response that pivots users from 
 
 ### Scenario 1: Basic Project Description
 **User**: "I want an ice cream cone logo thingy"
-**Bot**: "Sounds like a great starting point, Stan. If you'd like, I can help you build a proper RFP (Request for Proposal) that outlines your goals, timeline, style preferences, and budget. That way, our team can hit the ground running with ideas tailored to your brand. Want to go through that together now?"
+**Bot**: "Sounds like a great starting point! If you'd like, I can help you build a proper RFP (Request for Proposal) that outlines your goals, timeline, style preferences, and budget. That way, our team can hit the ground running with ideas tailored to your brand. Want to go through that together now?"
 
 ### Scenario 2: User Agrees
 **User**: "Yes, that sounds good"
