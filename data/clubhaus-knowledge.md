@@ -87,7 +87,20 @@ We design things you can hold:
 - **Liam** – Full Stack Developer  
   Strengths: AI integration, app development, database logic
 
+## 🎓 Team Accreditations & Expertise
+
+Our team members bring diverse expertise and accreditations:
+- **Sam**: Print and digital media design certification from Minneapolis College (MCTC)
+- **Noah**: Print and digital media design certification from Minneapolis College (MCTC)  
+- **Darby**: Bachelor of Fine Arts (BFA) with extensive experience in social media, marketing, animation, murals, painting, and illustration
+- **Liam**: Full stack development expertise with AI integration and database logic specializations
+
 ---
+
+## 🏆 Awards & Recognition
+
+- **Silver Award** - Best Web Design, Minnesota's Best Award
+- **Bronze Award** - Best Creative Services, Minnesota's Best Award
 
 ## 🏆 Past Clients
 

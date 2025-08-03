@@ -526,6 +526,29 @@ export const STRATEGIC_RESPONSES: StrategicResponse[] = [
   },
   {
     triggers: [
+      "accreditation",
+      "accreditations", 
+      "certification",
+      "certifications",
+      "certified",
+      "awards",
+      "recognition",
+      "clubhaus accreditations",
+      "clubhaus certifications",
+      "clubhaus awards",
+      "what awards",
+      "what certifications",
+      "what accreditations",
+      "tell me about clubhaus accreditations",
+      "what are clubhaus accreditations",
+      "clubhaus credentials",
+      "clubhaus qualifications"
+    ],
+    response: "We're proud of our recognition and expertise. Clubhaus has won the Silver Award for Best Web Design and Bronze Award for Best Creative Services in Minnesota's Best Awards. Our team members have diverse accreditations including design certifications from Minneapolis College (MCTC), Bachelor of Fine Arts degrees, and specialized expertise in AI integration, development, and creative strategy.",
+    followUp: "What's driving your need for a logo right now?"
+  },
+  {
+    triggers: [
       "what membership plans do you offer",
       "do you offer subscriptions",
       "do you have packages or retainers",
