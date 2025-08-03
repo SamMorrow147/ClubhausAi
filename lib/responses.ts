@@ -7,6 +7,54 @@ export interface StrategicResponse {
 }
 
 export const STRATEGIC_RESPONSES: StrategicResponse[] = [
+  // BASIC PROJECT DESCRIPTION PIVOT TO RFP
+  {
+    triggers: [
+      "ice cream cone logo",
+      "logo thingy",
+      "simple logo",
+      "basic logo",
+      "quick logo",
+      "logo design",
+      "branding",
+      "website",
+      "web design",
+      "social media",
+      "marketing",
+      "graphic design",
+      "print design",
+      "business cards",
+      "brochures",
+      "flyers",
+      "packaging",
+      "illustration",
+      "animation",
+      "video",
+      "photography",
+      "content creation",
+      "copywriting",
+      "brand identity",
+      "visual identity",
+      "UI/UX",
+      "app design",
+      "mobile design",
+      "e-commerce",
+      "online store",
+      "digital marketing",
+      "email marketing",
+      "SEO",
+      "PPC",
+      "advertising",
+      "campaign",
+      "promotional materials",
+      "product design",
+      "consulting",
+      "strategy"
+    ],
+    response: "Sounds like a great starting point, Stan. If you'd like, I can help you build a proper RFP (Request for Proposal) that outlines your goals, timeline, style preferences, and budget. That way, our team can hit the ground running with ideas tailored to your brand. Want to go through that together now?",
+    followUp: "Awesome. Let's start with a few quick questions to get the ball rolling. First up: What's the name of your business?",
+    nextStep: "rfp_initiated"
+  },
   // RFP/PROPOSAL ASSISTANCE FLOW
   {
     triggers: [

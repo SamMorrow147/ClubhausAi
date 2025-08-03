@@ -158,11 +158,12 @@ export async function POST(req: Request) {
 
     console.log('📝 User message:', lastMessage.content)
 
-    // Count bot messages in conversation to trigger contact capture
+    // Count bot messages in conversation to trigger contact capture and RFP pivot
     const botMessageCount = messages.filter(msg => msg.role === 'assistant').length
     const isThirdBotMessage = botMessageCount === 2 // This will be the 3rd bot message
+    const isSeventhMessage = botMessageCount === 6 // This will be the 7th bot message
     
-    console.log('🤖 Bot message count:', botMessageCount, 'Is 3rd message:', isThirdBotMessage)
+    console.log('🤖 Bot message count:', botMessageCount, 'Is 3rd message:', isThirdBotMessage, 'Is 7th message:', isSeventhMessage)
 
     // Initialize simple logger for chat logging
     const logger = SimpleLogger.getInstance()
@@ -269,6 +270,49 @@ export async function POST(req: Request) {
         )
       } else {
         console.log('👤 User already has contact info, skipping contact capture')
+      }
+    }
+
+    // RFP pivot on 7th bot message - offer to build proper RFP
+    if (isSeventhMessage) {
+      console.log('🎯 7th bot message detected - triggering RFP pivot')
+      
+      // Check if user has given a basic project description (not already in RFP flow)
+      const currentRFPFlow = rfpService.getFlowState(sessionId)
+      const hasBasicProjectDescription = lastMessage.content.length > 10 && 
+        !currentRFPFlow?.isActive &&
+        !lastMessage.content.toLowerCase().includes('yes') &&
+        !lastMessage.content.toLowerCase().includes('no') &&
+        !lastMessage.content.toLowerCase().includes('thanks') &&
+        !lastMessage.content.toLowerCase().includes('thank you')
+      
+      if (hasBasicProjectDescription) {
+        const rfpPivotMessage = "Sounds like a great starting point, Stan. If you'd like, I can help you build a proper RFP (Request for Proposal) that outlines your goals, timeline, style preferences, and budget. That way, our team can hit the ground running with ideas tailored to your brand. Want to go through that together now?"
+        
+        // Log the RFP pivot response in background (non-blocking)
+        logger.logAIResponse(userId, rfpPivotMessage, {
+          sessionId,
+          projectType: 'rfp_pivot',
+          requestId,
+          responseTime: Date.now() - startTime,
+          isRFPPivot: true
+        }).catch(logError => {
+          console.error('❌ Failed to log RFP pivot message (non-blocking):', logError)
+        })
+
+        return new Response(
+          JSON.stringify({ 
+            message: rfpPivotMessage,
+            context: 'RFP pivot on 7th message',
+            debug: { requestId, responseType: 'RFP_PIVOT', responseTime: Date.now() - startTime, messageNumber: 7 }
+          }),
+          { 
+            status: 200, 
+            headers: { 'Content-Type': 'application/json' } 
+          }
+        )
+      } else {
+        console.log('📝 User response doesn\'t warrant RFP pivot, continuing normal flow')
       }
     }
 
@@ -388,11 +432,63 @@ export async function POST(req: Request) {
       }
     }
 
+    // Check for RFP pivot follow-up responses (yes/no to RFP offer)
+    const userMessageLower = lastMessage.content.toLowerCase()
+    const isYesResponse = userMessageLower.includes('yes') || userMessageLower.includes('yeah') || userMessageLower.includes('sure') || userMessageLower.includes('okay') || userMessageLower.includes('ok')
+    const isNoResponse = userMessageLower.includes('no') || userMessageLower.includes('not') || userMessageLower.includes('maybe later') || userMessageLower.includes('not right now')
+    
+    // Check if this is likely a response to the RFP pivot (based on message count and content)
+    const isLikelyRFPPivotResponse = botMessageCount >= 6 && (isYesResponse || isNoResponse)
+    
+    if (isLikelyRFPPivotResponse) {
+      if (isYesResponse) {
+        console.log('✅ User agreed to RFP process')
+        rfpService.startRFPFlow(sessionId)
+        const rfpStartMessage = "Awesome. Let's start with a few quick questions to get the ball rolling. First up: What's the name of your business?"
+        
+        return new Response(
+          JSON.stringify({
+            message: rfpStartMessage,
+            context: 'RFP flow started after user agreed',
+            debug: { requestId, responseType: 'RFP_STARTED_AFTER_AGREEMENT', responseTime: Date.now() - startTime }
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      } else {
+        console.log('❌ User declined RFP process')
+        const rfpDeclineMessage = "Thanks! If you ever want to turn this into a more formal brief or RFP, just say the word—I've got your back."
+        
+        return new Response(
+          JSON.stringify({
+            message: rfpDeclineMessage,
+            context: 'RFP declined, offering future option',
+            debug: { requestId, responseType: 'RFP_DECLINED', responseTime: Date.now() - startTime }
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
+    }
+
     // Check for strategic responses first
     const strategicResponse = findStrategicResponse(lastMessage.content)
     if (strategicResponse) {
       console.log('🎯 Found strategic response for:', strategicResponse.triggers[0])
       console.log('📝 Strategic response triggered, bypassing RAG')
+      
+      // Check if this is an RFP pivot response (basic project description)
+      if (strategicResponse.nextStep === 'rfp_initiated') {
+        console.log('📋 RFP pivot response detected')
+        const formattedResponse = formatStrategicResponse(strategicResponse)
+        
+        return new Response(
+          JSON.stringify({
+            message: formattedResponse,
+            context: 'RFP pivot response',
+            debug: { requestId, responseType: 'RFP_PIVOT_RESPONSE', responseTime: Date.now() - startTime }
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
       
       // Check if this is an RFP-related strategic response
       if (strategicResponse.requiresContactInfo) {
