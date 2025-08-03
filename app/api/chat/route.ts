@@ -9,6 +9,7 @@ import { checkProjectTriggers } from '../../../lib/projectHandler'
 import SimpleLogger from '../../../lib/simpleLogger'
 import UserProfileService from '../../../lib/userProfileService'
 import TokenUsageService from '../../../lib/tokenUsageService'
+import { rfpService } from '../../../lib/rfpService'
 
 // Create Groq provider instance
 const groq = createGroq({
@@ -292,11 +293,122 @@ export async function POST(req: Request) {
       )
     }
 
+    // Check for RFP flow first
+    const currentRFPFlow = rfpService.getFlowState(sessionId)
+    
+    if (currentRFPFlow && currentRFPFlow.isActive) {
+      console.log('📋 RFP flow active, step:', currentRFPFlow.step)
+      
+      // Handle different RFP flow steps
+      switch (currentRFPFlow.step) {
+        case 'contact_info':
+          // Extract contact info from user message
+          const contactInfo = rfpService.extractContactInfo(lastMessage.content)
+          if (contactInfo) {
+            rfpService.updateContactInfo(sessionId, contactInfo)
+            return new Response(
+              JSON.stringify({
+                message: "Great! What type of service or product are you requesting a proposal for?",
+                context: 'RFP flow - contact info collected',
+                debug: { requestId, responseType: 'RFP_CONTACT_COLLECTED', responseTime: Date.now() - startTime }
+              }),
+              { status: 200, headers: { 'Content-Type': 'application/json' } }
+            )
+          } else {
+            return new Response(
+              JSON.stringify({
+                message: "I need your name, email, and phone number to get started. Could you provide those?",
+                context: 'RFP flow - contact info needed',
+                debug: { requestId, responseType: 'RFP_CONTACT_NEEDED', responseTime: Date.now() - startTime }
+              }),
+              { status: 200, headers: { 'Content-Type': 'application/json' } }
+            )
+          }
+          
+        case 'service_type':
+          rfpService.updateServiceType(sessionId, lastMessage.content)
+          return new Response(
+            JSON.stringify({
+              message: "Got it. What's your ideal timeline or deadline for this project?",
+              context: 'RFP flow - service type collected',
+              debug: { requestId, responseType: 'RFP_SERVICE_COLLECTED', responseTime: Date.now() - startTime }
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          )
+          
+        case 'timeline':
+          rfpService.updateTimeline(sessionId, lastMessage.content)
+          return new Response(
+            JSON.stringify({
+              message: "Thanks! Do you already have a budget range or cap in mind?",
+              context: 'RFP flow - timeline collected',
+              debug: { requestId, responseType: 'RFP_TIMELINE_COLLECTED', responseTime: Date.now() - startTime }
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          )
+          
+        case 'budget':
+          rfpService.updateBudget(sessionId, lastMessage.content)
+          return new Response(
+            JSON.stringify({
+              message: "Understood. What outcomes or goals are you hoping this project achieves? (e.g., increased sales, better UX, new product launch, rebranding)",
+              context: 'RFP flow - budget collected',
+              debug: { requestId, responseType: 'RFP_BUDGET_COLLECTED', responseTime: Date.now() - startTime }
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          )
+          
+        case 'goals':
+          rfpService.updateGoals(sessionId, lastMessage.content)
+          return new Response(
+            JSON.stringify({
+              message: "Thanks for all the details! Would you like me to help you format this into a proposal document or keep it conversational for now?",
+              context: 'RFP flow - goals collected',
+              debug: { requestId, responseType: 'RFP_GOALS_COLLECTED', responseTime: Date.now() - startTime }
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          )
+          
+        case 'proposal_format':
+          rfpService.updateProposalFormat(sessionId, lastMessage.content)
+          const rfpData = rfpService.completeRFPFlow(sessionId)
+          if (rfpData) {
+            const summary = rfpService.generateProposalSummary(rfpData)
+            return new Response(
+              JSON.stringify({
+                message: summary,
+                context: 'RFP flow - completed',
+                rfpData,
+                debug: { requestId, responseType: 'RFP_COMPLETED', responseTime: Date.now() - startTime }
+              }),
+              { status: 200, headers: { 'Content-Type': 'application/json' } }
+            )
+          }
+          break
+      }
+    }
+
     // Check for strategic responses first
     const strategicResponse = findStrategicResponse(lastMessage.content)
     if (strategicResponse) {
       console.log('🎯 Found strategic response for:', strategicResponse.triggers[0])
       console.log('📝 Strategic response triggered, bypassing RAG')
+      
+      // Check if this is an RFP-related strategic response
+      if (strategicResponse.requiresContactInfo) {
+        console.log('📋 RFP flow initiated')
+        rfpService.startRFPFlow(sessionId)
+        const formattedResponse = formatStrategicResponse(strategicResponse)
+        
+        return new Response(
+          JSON.stringify({
+            message: formattedResponse,
+            context: 'RFP flow initiated',
+            debug: { requestId, responseType: 'RFP_INITIATED', responseTime: Date.now() - startTime }
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
       
       // Check if this is a brewery-related strategic response
       const isBreweryResponse = strategicResponse.triggers.some(trigger => 
@@ -439,8 +551,16 @@ Acknowledge their request naturally, then ask 1-2 of these questions. Keep it co
       
       // Check if user just provided their name (following contact capture)
       const justProvidedName = extractedInfo.name && !userProfile?.name
-      const justProvidedEmail = extractedInfo.email && !userProfile?.email
+      const justProvidedEmail = extractedInfo.email && !userProfile?.email && userProfileService.validateEmailInMessage(lastMessage.content)
       const justProvidedPhone = extractedInfo.phone && !userProfile?.phone
+      
+      // Check if user provided invalid email-like text
+      const providedInvalidEmail = !userProfile?.email && !userProfileService.validateEmailInMessage(lastMessage.content) && 
+                                 (lastMessage.content.toLowerCase().includes('@') || 
+                                  lastMessage.content.toLowerCase().includes('email') ||
+                                  lastMessage.content.toLowerCase().includes('gmail') ||
+                                  lastMessage.content.toLowerCase().includes('yahoo') ||
+                                  lastMessage.content.toLowerCase().includes('hotmail'))
       
       // Detect if user is being brief/short in responses or giving vague answers
       const userIsBrief = (lastMessage.content.length < 20 && !lastMessage.content.includes('?')) || 
@@ -462,6 +582,7 @@ Missing user info: ${missingInfo.join(', ')}
 ${justProvidedName && !userInfoStatus.hasEmail ? '✅ Got name! Now ask: "What\'s your email so we can send over some ideas?"' : ''}
 ${justProvidedEmail && !userInfoStatus.hasPhone ? '✅ Got email! Now ask: "And what\'s the best number to reach you at?"' : ''}
 ${justProvidedPhone ? '✅ Got all contact info! Thank them briefly and continue the conversation naturally.' : ''}
+${providedInvalidEmail ? '❌ Invalid email provided. Ask: "I didn\'t catch a valid email address there. Could you share your email address so we can follow up?"' : ''}
 
 CONTACT CAPTURE FLOW (After 3rd message):
 - Message 3: "Before we dive deeper, let me get your name and contact info..."
@@ -477,7 +598,8 @@ Guidelines:
 - Let the user do most of the talking about their needs
 - DON'T repeat back phone numbers or email addresses - just acknowledge and move on
 - For phone numbers: "Thanks, [name]. Got it." then continue
-- For email: "Got it." then ask for phone number`
+- For email: "Got it." then ask for phone number
+- If user provides invalid email-like text, politely ask for a valid email address`
     }
 
     const systemPrompt = `You are the Clubhaus AI assistant. You represent a creative agency that values sharp thinking, curiosity, and clarity.

@@ -109,26 +109,20 @@ export function ChatInterface() {
     )
   }
 
-  // Simple auto-scroll to bottom when new messages are added
+  // Instant auto-scroll to bottom when new messages are added
   useEffect(() => {
     const messagesContainer = document.querySelector('.messages-container') as HTMLElement
     if (messagesContainer) {
-      // Simple, direct scroll to bottom with a small buffer to ensure full visibility
-      setTimeout(() => {
-        messagesContainer.scrollTop = messagesContainer.scrollHeight + 50
-      }, 100)
+      // Instant scroll to bottom
+      messagesContainer.scrollTop = messagesContainer.scrollHeight + 50
     }
   }, [messages])
 
   // Keep input focused after messages are sent and responses are received
   useEffect(() => {
     if (!isLoading && inputRef.current) {
-      // Small delay to ensure the component has finished updating
-      setTimeout(() => {
-        if (inputRef.current) {
-          inputRef.current.focus()
-        }
-      }, 100)
+      // Instant focus
+      inputRef.current.focus()
     }
   }, [isLoading])
 
@@ -168,47 +162,34 @@ export function ChatInterface() {
       content: messageText
     }
 
-    // Clear input immediately regardless of which path we take
+    // Clear input immediately
     setInput('')
-    
-    // Also force clear the input element directly
     if (inputRef.current) {
       inputRef.current.value = ''
     }
 
-    // Refocus the input after clearing
-    setTimeout(() => {
-      if (inputRef.current) {
-        inputRef.current.focus()
-      }
-    }, 0)
+    // Add user message INSTANTLY - no delays
+    setMessages(prev => [...prev, userMessage])
 
-    // Create a loading message
+    // Create loading message immediately after user message
     const loadingId = (Date.now() + 1).toString()
     const loadingMessage: Message = {
       id: loadingId,
       role: 'assistant',
-      content: 'loading' // Special content to indicate loading
+      content: 'loading'
     }
 
-    // Handle first message animation
+    // Add loading message immediately - no delays for any message
+    setMessages(prev => [...prev, loadingMessage])
+    setLoadingMessageId(loadingId)
+
+    // Handle first message animation without delays
     if (messages.length === 0) {
-      // Simplified first message animation - no complex morphing
       setHasFirstMessage(true)
-      
-      // Add both messages with a simple delay to avoid layout shifts
-      setTimeout(() => {
-        setMessages(prev => [...prev, userMessage, loadingMessage])
-        setLoadingMessageId(loadingId)
-      }, 400) // Single, shorter delay
-    } else {
-      // For subsequent messages, add both in correct order
-      setMessages(prev => [...prev, userMessage, loadingMessage])
-      setLoadingMessageId(loadingId)
     }
 
     setIsLoading(true)
-    setLastError(null) // Clear previous errors
+    setLastError(null)
 
     try {
       const response = await fetch('/api/chat', {
@@ -260,39 +241,28 @@ export function ChatInterface() {
       content: question
     }
 
-    // Ensure input is focused when using quick questions
-    setTimeout(() => {
-      if (inputRef.current) {
-        inputRef.current.focus()
-      }
-    }, 0)
+    // Add user message INSTANTLY - no delays
+    setMessages(prev => [...prev, userMessage])
 
-    // Create a loading message
+    // Create loading message immediately after user message
     const loadingId = (Date.now() + 1).toString()
     const loadingMessage: Message = {
       id: loadingId,
       role: 'assistant',
-      content: 'loading' // Special content to indicate loading
+      content: 'loading'
     }
 
-    // Handle first message animation for quick questions
+    // Add loading message immediately - no delays for any message
+    setMessages(prev => [...prev, loadingMessage])
+    setLoadingMessageId(loadingId)
+
+    // Handle first message animation without delays
     if (messages.length === 0) {
-      // Simplified first message animation - no complex morphing
       setHasFirstMessage(true)
-      
-      // Add both messages with a simple delay to avoid layout shifts
-      setTimeout(() => {
-        setMessages(prev => [...prev, userMessage, loadingMessage])
-        setLoadingMessageId(loadingId)
-      }, 400) // Single, shorter delay
-    } else {
-      // For subsequent messages, add both in correct order
-      setMessages(prev => [...prev, userMessage, loadingMessage])
-      setLoadingMessageId(loadingId)
     }
 
     setIsLoading(true)
-    setLastError(null) // Clear previous errors
+    setLastError(null)
 
     try {
       const response = await fetch('/api/chat', {
@@ -351,6 +321,16 @@ export function ChatInterface() {
 
   return (
     <div className="chat-page-container flex items-center justify-center p-4">
+      {/* Ripple background for light mode */}
+      {isLightMode && (
+        <div className="ripple-background">
+          <div className="circle xxlarge shade1"></div>
+          <div className="circle xlarge shade2"></div>
+          <div className="circle large shade3"></div>
+          <div className="circle medium shade4"></div>
+          <div className="circle small shade5"></div>
+        </div>
+      )}
       <div className="glow-card" ref={cardRef}>
         <span className="glow"></span>
         <div className="inner">
@@ -402,7 +382,7 @@ export function ChatInterface() {
                     scale: 1
                   }}
                   transition={{
-                    duration: 0.6,
+                    duration: 0.3,
                     ease: [0.25, 0.46, 0.45, 0.94]
                   }}
                 >
@@ -476,7 +456,7 @@ export function ChatInterface() {
                     y: hasFirstMessage ? -20 : 0
                   }}
                   transition={{
-                    duration: 0.4,
+                    duration: 0.2,
                     ease: "easeOut"
                   }}
                 >
@@ -513,11 +493,11 @@ export function ChatInterface() {
                       <motion.div
                         key={message.id}
                         className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                        initial={{ opacity: 0, y: 10 }}
+                        initial={{ opacity: 0, y: 5 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{
-                          duration: 0.3,
-                          delay: index * 0.1,
+                          duration: 0.2,
+                          delay: 0,
                           ease: "easeOut"
                         }}
                       >
@@ -535,18 +515,14 @@ export function ChatInterface() {
                                   ? 'bot-message-light px-4 py-3'
                                   : 'bot-message-dark px-4 py-3'
                           }`}
-                          initial={message.id === loadingMessageId && message.content !== 'loading' && message.role === 'user' ? { 
-                            opacity: 0, 
-                            scale: 0.98
-                          } : false}
-                          animate={message.role === 'assistant' ? false : { 
+                          initial={false}
+                          animate={{ 
                             opacity: 1, 
                             scale: 1
                           }}
-                          transition={message.role === 'assistant' ? { duration: 0 } : {
-                            duration: 0.5,
-                            ease: "easeOut",
-                            delay: message.id === loadingMessageId && message.content !== 'loading' && message.role === 'user' ? 0.3 : 0
+                          transition={{
+                            duration: 0.1,
+                            ease: "easeOut"
                           }}
                         >
                           {message.content === 'loading' ? (

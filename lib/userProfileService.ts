@@ -132,16 +132,55 @@ export class UserProfileService {
   }
 
   /**
+   * Validate if a message contains a valid email address
+   */
+  validateEmailInMessage(message: string): boolean {
+    const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g
+    const emailMatch = message.match(emailRegex)
+    
+    if (!emailMatch || !emailMatch[0]) {
+      return false
+    }
+    
+    const potentialEmail = emailMatch[0]
+    
+    // Additional validation to ensure it's actually a valid email
+    const emailValidationRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}$/
+    if (!emailValidationRegex.test(potentialEmail)) {
+      return false
+    }
+    
+    // Additional checks to avoid false positives
+    const emailParts = potentialEmail.split('@')
+    if (emailParts.length !== 2) {
+      return false
+    }
+    
+    const domain = emailParts[1]
+    const localPart = emailParts[0]
+    
+    const hasValidDomain = Boolean(domain && domain.length > 3 && domain.includes('.'))
+    const hasValidLocalPart = Boolean(localPart && localPart.length > 0)
+    
+    return hasValidDomain && hasValidLocalPart
+  }
+
+  /**
    * Extract user information from a message
    */
   extractUserInfoFromMessage(message: string, context?: { askedForName?: boolean }): Partial<Pick<UserProfile, 'name' | 'email' | 'phone' | 'businessName' | 'projectBudget'>> {
     const extracted: Partial<Pick<UserProfile, 'name' | 'email' | 'phone' | 'businessName' | 'projectBudget'>> = {}
     
-    // Extract email using regex
+    // Extract email using regex with additional validation
     const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g
     const emailMatch = message.match(emailRegex)
     if (emailMatch && emailMatch[0]) {
-      extracted.email = emailMatch[0]
+      const potentialEmail = emailMatch[0]
+      
+      // Use the same validation logic as validateEmailInMessage
+      if (this.validateEmailInMessage(potentialEmail)) {
+        extracted.email = potentialEmail
+      }
     }
 
     // Extract phone using regex (various formats)
