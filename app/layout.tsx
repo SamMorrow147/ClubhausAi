@@ -17,7 +17,7 @@ export const metadata: Metadata = {
     siteName: 'Clubhaus AI',
     images: [
       {
-        url: '/gifs/Small-Transparent-messeger-app-Chip.gif',
+        url: '/CHCoin.gif',
         width: 1200,
         height: 630,
         alt: 'Clubhaus AI Assistant',
@@ -31,7 +31,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Clubhaus AI',
     description: 'Your personal AI assistant for all things Clubhaus',
-    images: ['/gifs/Small-Transparent-messeger-app-Chip.gif'],
+    images: ['/CHCoin.gif'],
     creator: '@clubhaus',
     site: '@clubhaus',
   },

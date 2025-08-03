@@ -99,6 +99,10 @@ export async function POST(req: Request) {
   const startTime = Date.now()
   const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
   
+  // Declare these variables outside try block so they're available in catch
+  let userId = 'anonymous'
+  let sessionId = `session_${Date.now()}`
+  
   try {
     // Set a timeout for the entire request to prevent hanging
     const requestTimeout = setTimeout(() => {
@@ -145,8 +149,8 @@ export async function POST(req: Request) {
     
     // Initialize token usage service (this will test connection and migrate data if needed)
     await tokenUsageService.initialize()
-    const userId = 'anonymous' // In a real app, this would come from authentication
-    const sessionId = providedSessionId || `session_${Date.now()}`
+    userId = 'anonymous' // In a real app, this would come from authentication
+    sessionId = providedSessionId || `session_${Date.now()}`
     
     // Extract user information from the message - but be more conservative about names
     const extractedInfo = userProfileService.extractUserInfoFromMessage(lastMessage.content)
@@ -464,6 +468,7 @@ Guidelines:
 4. **Confident, not cautious** - Don't say "tattoos are a big commitment" - say "tattoos and skateboard design go hand-in-hand" ONLY when both are mentioned
 5. **Lead with confidence** - "Definitely. After [previous project], some of our other favorites include..."
 6. **Stay relevant** - Don't mention skateboards or tattoos unless the user brings them up first
+7. **Accurate client categorization** - NEVER misclassify clients. Experience Maple Grove is a DMO (Destination Marketing Organization), not a park. Always use the exact client type from the knowledge base.
 
 🎯 Behavioral Rules:
 1. NEVER say you'll do something you can't actually do.
@@ -727,6 +732,62 @@ Use this information to inform your responses, but speak like a sharp, curious c
     } else if (error.code === 'ETIMEDOUT' || error.message?.includes('ETIMEDOUT')) {
       errorResponse.error = 'Connection timed out. Please try again.'
       errorResponse.debug.errorType = 'CONNECTION_TIMEOUT'
+    }
+
+    // Log the error response to chat logs - this is CRITICAL for debugging!
+    try {
+      const logger = SimpleLogger.getInstance()
+      
+      // Log the user-facing error message that gets sent to the frontend
+      await logger.logAIResponse(userId, errorResponse.error, {
+        sessionId,
+        requestId,
+        responseTime: totalTime,
+        isError: true,
+        errorType: errorResponse.debug.errorType,
+        platform: 'chat_ui',
+        type: 'error_response'
+      })
+
+      // ALSO log what the frontend actually shows to the user (different from server error)
+      const frontendErrorMessage = 'Sorry, I encountered an error. Please try again.'
+      await logger.logAIResponse(userId, frontendErrorMessage, {
+        sessionId,
+        requestId,
+        responseTime: totalTime,
+        isError: true,
+        isFrontendMessage: true,
+        errorType: errorResponse.debug.errorType,
+        platform: 'chat_ui',
+        type: 'frontend_error_display',
+        note: 'This is what the user actually sees in the chat interface'
+      })
+
+      // ALSO log the detailed debug information as a separate entry for developers
+      const debugLogMessage = `🚨 ERROR DEBUG INFO:
+- Request ID: ${requestId}
+- Error Type: ${errorResponse.debug.errorType}  
+- Error Message: ${errorResponse.debug.errorMessage}
+- Error Name: ${errorResponse.debug.errorName}
+- Total Time: ${totalTime}ms
+- Timestamp: ${errorResponse.debug.timestamp}
+- Stack: ${error.stack?.substring(0, 500) || 'No stack trace'}`
+
+      await logger.logAIResponse(userId, debugLogMessage, {
+        sessionId,
+        requestId,
+        responseTime: totalTime,
+        isError: true,
+        isDebugInfo: true,
+        errorType: errorResponse.debug.errorType,
+        platform: 'chat_ui',
+        type: 'error_debug'
+      })
+
+      console.log('📝 ✅ Logged 3 error entries to chat logs: server error, frontend display, and debug info')
+    } catch (logError) {
+      console.error('❌ Failed to log error to chat logs:', logError)
+      // Don't fail the request if error logging fails
     }
 
     return new Response(

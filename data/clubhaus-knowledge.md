@@ -113,7 +113,7 @@ These are our highest-impact, most conversation-worthy projects:
 
 - **Blasted Ink**: Custom tattoo shop branding with hand-drawn typography, now at Mall of America. Demonstrates bold, art-driven branding that doesn't blend in.
 
-- **Experience Maple Grove**: Year-round creative and digital marketing for city tourism, including Restaurant Week and Winter Fest. Shows our ability to handle large-scale, multi-platform campaigns.
+- **Experience Maple Grove**: Year-round creative and digital marketing for a DMO (Destination Marketing Organization) in Maple Grove, including Restaurant Week and Winter Fest. Shows our ability to handle large-scale, multi-platform campaigns for tourism and destination marketing.
 
 ### Other Notable Projects
 - **Fiocchi Ammunition**: Sam rebranded this Italian ammunition company and recreated over 1,000 package designs, impacting packaging internationally for the brand.

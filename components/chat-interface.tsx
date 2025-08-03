@@ -523,7 +523,8 @@ export function ChatInterface() {
                                   fontFamily: 'inherit',
                                   fontWeight: '100',
                                   position: 'relative',
-                                  zIndex: 10
+                                  zIndex: 10,
+                                  letterSpacing: '0.1em'
                                 }}>Strategizing...</span>
                               </div>
                             </div>
