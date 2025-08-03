@@ -370,7 +370,7 @@ export function ChatInterface() {
               {(messages.length === 0 || hasFirstMessage) && (
                 <motion.div 
                   ref={initialGifRef}
-                  className="relative"
+                  className="relative gif-animation-container"
                   style={{ 
                     zIndex: 100,
                     opacity: 1,
@@ -386,7 +386,7 @@ export function ChatInterface() {
                   } : false}
                   animate={hasFirstMessage ? {
                     position: 'fixed',
-                    top: '0px',
+                    top: '4px',
                     right: '3px',
                     width: '3rem',
                     height: '3rem',
@@ -406,11 +406,55 @@ export function ChatInterface() {
                     ease: [0.25, 0.46, 0.45, 0.94]
                   }}
                 >
-                  {/* Single GIF layer - no blur effects */}
+                  {/* Glow layers - only show when large */}
+                  {!hasFirstMessage && (
+                    <>
+                      {/* Most dispersed glow layer */}
+                      <motion.img 
+                        src="/gifs/Small-Transparent-messeger-app-Chip.gif" 
+                        alt="Clubhaus AI Assistant" 
+                        className="w-full h-full object-contain absolute inset-0 opacity-40"
+                        style={{
+                          filter: 'blur(12px)',
+                          zIndex: -2,
+                          mixBlendMode: 'multiply',
+                          backgroundColor: 'transparent'
+                        }}
+                        whileHover={{ scale: 1.05 }}
+                        transition={{
+                          type: "spring",
+                          stiffness: 300,
+                          damping: 20
+                        }}
+                      />
+                      {/* Medium blur layer for glow effect */}
+                      <motion.img 
+                        src="/gifs/Small-Transparent-messeger-app-Chip.gif" 
+                        alt="Clubhaus AI Assistant" 
+                        className="w-full h-full object-contain absolute inset-0 blur-lg opacity-60"
+                        style={{
+                          filter: 'blur(8px)',
+                          zIndex: -1,
+                          mixBlendMode: 'screen',
+                          backgroundColor: 'transparent'
+                        }}
+                        whileHover={{ scale: 1.05 }}
+                        transition={{
+                          type: "spring",
+                          stiffness: 300,
+                          damping: 20
+                        }}
+                      />
+                    </>
+                  )}
+                  {/* Main GIF layer */}
                   <motion.img 
                     src="/gifs/Small-Transparent-messeger-app-Chip.gif" 
                     alt="Clubhaus AI Assistant" 
-                    className="w-full h-full object-contain"
+                    className="w-full h-full object-contain relative"
+                    style={{
+                      backgroundColor: 'transparent'
+                    }}
                     whileHover={{ scale: 1.05 }}
                     transition={{
                       type: "spring",
@@ -485,11 +529,11 @@ export function ChatInterface() {
                               ? 'processing-message-box'
                               : message.role === 'user'
                                 ? isLightMode 
-                                  ? 'bg-blue-900/20 text-blue-900 border border-blue-900/30 px-4 py-3'
-                                  : 'bg-white/20 text-white border border-white/30 px-4 py-3'
+                                  ? 'user-message-light px-4 py-3'
+                                  : 'user-message-dark px-4 py-3'
                                 : isLightMode
-                                  ? 'bg-blue-900/10 text-blue-900/90 border border-blue-900/20 px-4 py-3'
-                                  : 'bg-white/10 text-white/90 border border-white/20 px-4 py-3'
+                                  ? 'bot-message-light px-4 py-3'
+                                  : 'bot-message-dark px-4 py-3'
                           }`}
                           initial={message.id === loadingMessageId && message.content !== 'loading' && message.role === 'user' ? { 
                             opacity: 0, 
@@ -516,9 +560,8 @@ export function ChatInterface() {
                                 : 'hsl(222.2, 84%, 4.9%)'
                             }}>
                               <div className="max-w-none">
-                                <span style={{ 
+                                <span className="glow-text" style={{ 
                                   whiteSpace: 'pre-wrap',
-                                  color: isLightMode ? '#1e3a8a' : '#ffffff',
                                   fontSize: 'inherit',
                                   fontFamily: 'inherit',
                                   fontWeight: '100',
@@ -572,15 +615,9 @@ export function ChatInterface() {
                   <button
                     type="submit"
                     disabled={!input.trim() || isLoading}
-                    className="cyberpunk-button"
+                    className={`cyberpunk-button ${isLoading ? 'loading' : ''}`}
                   >
-                    {isLoading ? (
-                      <div className="relative">
-                        <Loader2 className="w-4 h-4 animate-spin mx-auto" style={{ zIndex: 1000 }} />
-                      </div>
-                    ) : (
-                      <Send className="w-4 h-4 mx-auto" />
-                    )}
+                    {!isLoading && <Send className="w-4 h-4 ml-1" />}
                   </button>
                 </form>
               </div>

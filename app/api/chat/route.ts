@@ -15,15 +15,24 @@ const groq = createGroq({
   apiKey: process.env.GROQ_API_KEY,
 })
 
-// Load knowledge base directly
+// Cached knowledge base for instant access
+let cachedKnowledgeBase: string | null = null
+
+// Load knowledge base directly with caching
 function loadKnowledgeBase() {
+  if (cachedKnowledgeBase !== null) {
+    return cachedKnowledgeBase
+  }
+  
   try {
     const knowledgeFilePath = path.join(process.cwd(), 'data', 'clubhaus-knowledge.md')
     const markdownContent = fs.readFileSync(knowledgeFilePath, 'utf-8')
-    console.log('📖 Loaded knowledge base, length:', markdownContent.length)
+    cachedKnowledgeBase = markdownContent
+    console.log('📖 Loaded and cached knowledge base, length:', markdownContent.length)
     return markdownContent
   } catch (error) {
     console.error('❌ Failed to load knowledge base:', error)
+    cachedKnowledgeBase = ''
     return ''
   }
 }
@@ -95,6 +104,12 @@ function searchKnowledge(query: string, knowledgeContent: string): string {
 
 import { callGroqWithRetry, getRateLimitErrorMessage } from '../../../lib/groqRetry'
 
+// Helper function to calculate response delay - DISABLED for instant responses
+function calculateResponseDelay(botMessageCount: number, elapsedTime: number): number {
+  // NO DELAY - return 0 for instant responses
+  return 0
+}
+
 export async function POST(req: Request) {
   const startTime = Date.now()
   const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
@@ -142,20 +157,29 @@ export async function POST(req: Request) {
 
     console.log('📝 User message:', lastMessage.content)
 
+    // Count bot messages in conversation to trigger contact capture
+    const botMessageCount = messages.filter(msg => msg.role === 'assistant').length
+    const isThirdBotMessage = botMessageCount === 2 // This will be the 3rd bot message
+    
+    console.log('🤖 Bot message count:', botMessageCount, 'Is 3rd message:', isThirdBotMessage)
+
     // Initialize simple logger for chat logging
     const logger = SimpleLogger.getInstance()
     const userProfileService = UserProfileService.getInstance()
     const tokenUsageService = TokenUsageService.getInstance()
     
-    // Initialize token usage service (this will test connection and migrate data if needed)
-    await tokenUsageService.initialize()
+    // Initialize token usage service in background (non-blocking)
+    tokenUsageService.initialize().catch(error => {
+      console.error('❌ Token usage service initialization failed (non-blocking):', error)
+    })
+    
     userId = 'anonymous' // In a real app, this would come from authentication
     sessionId = providedSessionId || `session_${Date.now()}`
     
     // Extract user information from the message - but be more conservative about names
     const extractedInfo = userProfileService.extractUserInfoFromMessage(lastMessage.content)
     
-    // Only update profile if we have valid info AND it's not just a question word
+    // Update user profile in background (non-blocking)
     if (Object.keys(extractedInfo).length > 0) {
       // Additional validation for names - only accept if it's clearly a name
       if (extractedInfo.name) {
@@ -170,20 +194,81 @@ export async function POST(req: Request) {
       
       if (Object.keys(extractedInfo).length > 0) {
         console.log('👤 Extracted user info:', extractedInfo)
-        await userProfileService.updateUserProfile(userId, sessionId, extractedInfo)
+        // Run in background to avoid blocking response
+        userProfileService.updateUserProfile(userId, sessionId, extractedInfo).catch(error => {
+          console.error('❌ User profile update failed (non-blocking):', error)
+        })
       }
     }
     
-    // Log the user message
-    try {
-      await logger.logUserMessage(userId, lastMessage.content, {
-        sessionId,
-        extractedProfile: Object.keys(extractedInfo).length > 0 ? extractedInfo : undefined,
-        requestId
-      })
-    } catch (logError) {
-      console.error('❌ Failed to log user message:', logError)
-      // Don't fail the request if logging fails
+    // Log the user message in background (non-blocking)
+    logger.logUserMessage(userId, lastMessage.content, {
+      sessionId,
+      extractedProfile: Object.keys(extractedInfo).length > 0 ? extractedInfo : undefined,
+      requestId
+    }).catch(logError => {
+      console.error('❌ Failed to log user message (non-blocking):', logError)
+    })
+
+    // Get user profile status for context (only needed for contact capture and guidance)
+    // For first few messages, make this non-blocking to improve speed
+    let userInfoStatus, nextInfoToCollect, userProfile
+    
+    if (botMessageCount >= 2) {
+      // Only load user profile data when we actually need it (3rd message onwards)
+      userInfoStatus = await userProfileService.getUserInfoStatus(userId, sessionId)
+      nextInfoToCollect = await userProfileService.getNextInfoToCollect(userId, sessionId)
+      userProfile = await userProfileService.getUserProfile(userId, sessionId)
+      
+      console.log('👤 User info status:', userInfoStatus)
+      if (nextInfoToCollect) {
+        console.log('👤 Next info to collect:', nextInfoToCollect)
+      }
+    } else {
+      // For first 2 messages, set defaults to avoid blocking
+      userInfoStatus = { isComplete: false, hasName: false, hasEmail: false, hasPhone: false }
+      nextInfoToCollect = null
+      userProfile = null
+      console.log('⚡ Skipping user profile checks for fast first message')
+    }
+
+    // Contact capture on 3rd bot message - highest priority
+    if (isThirdBotMessage) {
+      console.log('🎯 3rd bot message detected - triggering contact capture')
+      
+      // Check if we already have contact info to avoid being pushy
+      const hasContact = userProfile && (userProfile.email || userProfile.phone)
+      
+      if (!hasContact) {
+        const contactCaptureMessage = "Before we dive deeper, let me get your name and contact info so I can have one of our strategists follow up with some ideas specifically for your project. What's your name?"
+        
+        // No delay - instant response
+        
+        // Log the contact capture response in background (non-blocking)
+        logger.logAIResponse(userId, contactCaptureMessage, {
+          sessionId,
+          projectType: 'contact_capture',
+          requestId,
+          responseTime: Date.now() - startTime,
+          isContactCapture: true
+        }).catch(logError => {
+          console.error('❌ Failed to log contact capture message (non-blocking):', logError)
+        })
+
+        return new Response(
+          JSON.stringify({ 
+            message: contactCaptureMessage,
+            context: 'Contact capture on 3rd message',
+            debug: { requestId, responseType: 'CONTACT_CAPTURE', responseTime: Date.now() - startTime, messageNumber: 3 }
+          }),
+          { 
+            status: 200, 
+            headers: { 'Content-Type': 'application/json' } 
+          }
+        )
+      } else {
+        console.log('👤 User already has contact info, skipping contact capture')
+      }
     }
 
     // Check for project triggers first
@@ -191,16 +276,7 @@ export async function POST(req: Request) {
     if (projectTrigger) {
       console.log('🎯 Found project trigger for:', projectTrigger.name)
       
-      // Ensure minimum 1-second delay for strategizing bubble
-      const currentTime = Date.now()
-      const elapsedTime = currentTime - startTime
-      const minimumDelayMs = 1000 // 1 second
-      
-      if (elapsedTime < minimumDelayMs) {
-        const remainingDelay = minimumDelayMs - elapsedTime
-        console.log(`⏳ Adding ${remainingDelay}ms delay to ensure minimum 1-second strategizing time`)
-        await new Promise(resolve => setTimeout(resolve, remainingDelay))
-      }
+      // No delay - instant response
       
       return new Response(
         JSON.stringify({ 
@@ -255,16 +331,7 @@ export async function POST(req: Request) {
           finalResponse += `\n\n${breweryDetail}`
         }
         
-        // Ensure minimum 1-second delay for strategizing bubble
-        const currentTime = Date.now()
-        const elapsedTime = currentTime - startTime
-        const minimumDelayMs = 1000 // 1 second
-        
-        if (elapsedTime < minimumDelayMs) {
-          const remainingDelay = minimumDelayMs - elapsedTime
-          console.log(`⏳ Adding ${remainingDelay}ms delay to ensure minimum 1-second strategizing time`)
-          await new Promise(resolve => setTimeout(resolve, remainingDelay))
-        }
+        // No delay - instant response
         
         return new Response(
           JSON.stringify({ 
@@ -301,16 +368,7 @@ export async function POST(req: Request) {
           finalResponse += `\n\n${muralDetail}`
         }
         
-        // Ensure minimum 1-second delay for strategizing bubble
-        const currentTime = Date.now()
-        const elapsedTime = currentTime - startTime
-        const minimumDelayMs = 1000 // 1 second
-        
-        if (elapsedTime < minimumDelayMs) {
-          const remainingDelay = minimumDelayMs - elapsedTime
-          console.log(`⏳ Adding ${remainingDelay}ms delay to ensure minimum 1-second strategizing time`)
-          await new Promise(resolve => setTimeout(resolve, remainingDelay))
-        }
+        // No delay - instant response
         
         return new Response(
           JSON.stringify({ 
@@ -328,16 +386,7 @@ export async function POST(req: Request) {
         // Regular strategic response
         const formattedResponse = formatStrategicResponse(strategicResponse)
         
-        // Ensure minimum 1-second delay for strategizing bubble
-        const currentTime = Date.now()
-        const elapsedTime = currentTime - startTime
-        const minimumDelayMs = 1000 // 1 second
-        
-        if (elapsedTime < minimumDelayMs) {
-          const remainingDelay = minimumDelayMs - elapsedTime
-          console.log(`⏳ Adding ${remainingDelay}ms delay to ensure minimum 1-second strategizing time`)
-          await new Promise(resolve => setTimeout(resolve, remainingDelay))
-        }
+        // No delay - instant response
         
         return new Response(
           JSON.stringify({ 
@@ -361,16 +410,6 @@ export async function POST(req: Request) {
       console.log('🎯 Detected project type:', detectedProjectType)
     }
 
-    // Get user profile status for context
-    const userInfoStatus = await userProfileService.getUserInfoStatus(userId, sessionId)
-    const nextInfoToCollect = await userProfileService.getNextInfoToCollect(userId, sessionId)
-    const userProfile = await userProfileService.getUserProfile(userId, sessionId)
-    
-    console.log('👤 User info status:', userInfoStatus)
-    if (nextInfoToCollect) {
-      console.log('👤 Next info to collect:', nextInfoToCollect)
-    }
-
     // Load knowledge base and search for relevant content
     const knowledgeContent = loadKnowledgeBase()
     const relevantContext = searchKnowledge(lastMessage.content, knowledgeContent)
@@ -390,7 +429,7 @@ ${projectQuestions.map((q, i) => `${i + 1}. ${q}`).join('\n')}
 Acknowledge their request naturally, then ask 1-2 of these questions. Keep it conversational and under 80 words.`
     }
 
-    // User information collection guidance
+    // User information collection guidance - enhanced for post-contact-capture flow
     let userInfoGuidance = ''
     if (!userInfoStatus.isComplete) {
       const missingInfo = []
@@ -398,45 +437,47 @@ Acknowledge their request naturally, then ask 1-2 of these questions. Keep it co
       if (!userInfoStatus.hasEmail) missingInfo.push('email')  
       if (!userInfoStatus.hasPhone) missingInfo.push('phone number')
       
-      // Check if this is a new conversation (first or second message)
-      const isNewConversation = messages.length <= 2
-      const shouldAskForContact = messages.length >= 4 && !userInfoStatus.isComplete
+      // Check if user just provided their name (following contact capture)
+      const justProvidedName = extractedInfo.name && !userProfile?.name
+      const justProvidedEmail = extractedInfo.email && !userProfile?.email
+      const justProvidedPhone = extractedInfo.phone && !userProfile?.phone
       
       // Detect if user is being brief/short in responses or giving vague answers
       const userIsBrief = (lastMessage.content.length < 20 && !lastMessage.content.includes('?')) || 
                          ['im not sure', 'i dont know', 'not sure', 'idk', 'dunno', 'maybe', 'i guess'].some(phrase => 
                            lastMessage.content.toLowerCase().includes(phrase))
-      const shouldOfferHuman = userIsBrief && messages.length >= 3
       
-      console.log('👤 User brief detection:', { 
-        messageLength: lastMessage.content.length, 
-        hasQuestion: lastMessage.content.includes('?'), 
-        userIsBrief, 
-        messageCount: messages.length, 
-        shouldOfferHuman 
+      console.log('👤 Contact collection flow:', { 
+        justProvidedName, 
+        justProvidedEmail, 
+        justProvidedPhone,
+        missingInfo,
+        botMessageCount
       })
       
       userInfoGuidance = `
-🎯 USER INFORMATION COLLECTION:
+🎯 USER INFORMATION COLLECTION (Post Contact-Capture Flow):
 Missing user info: ${missingInfo.join(', ')}
 
-IMPORTANT: Ask for contact information by the 4th-5th message exchange. Keep responses concise and let the user do most of the talking.
+${justProvidedName && !userInfoStatus.hasEmail ? '✅ Got name! Now ask: "What\'s your email so we can send over some ideas?"' : ''}
+${justProvidedEmail && !userInfoStatus.hasPhone ? '✅ Got email! Now ask: "And what\'s the best number to reach you at?"' : ''}
+${justProvidedPhone ? '✅ Got all contact info! Thank them briefly and continue the conversation naturally.' : ''}
 
-${shouldAskForContact ? '🚨 CONTACT TIME: Ask for name and email in this response. This is message #' + messages.length + ' - time to collect contact info.' : ''}
-${shouldOfferHuman ? '🚨 BRIEF USER DETECTED: User is being brief/vague. STOP asking questions and immediately ask: "Can I get your info for the report?"' : ''}
-${nextInfoToCollect ? `Next to collect: ${nextInfoToCollect}` : ''}
+CONTACT CAPTURE FLOW (After 3rd message):
+- Message 3: "Before we dive deeper, let me get your name and contact info..."
+- Follow-up 1: If they give name → ask for email
+- Follow-up 2: If they give email → ask for phone  
+- Follow-up 3: Thank them briefly and continue conversation
 
 Guidelines:
-- Keep responses short and focused - don't be verbose
-- Let the user explain their needs - don't guess or answer for them
-- Ask simple, direct questions - don't make assumptions
-- If user is brief/vague after 2-3 exchanges, immediately ask: "Can I get your info for the report?"
-- Ask for name: "Can I get a name to put on the report I'll provide to the rest of the team?"
-- Ask for email: "What's your email so we can send you more details?"
-- Ask for phone: "What's the best number to reach you at?"
-- Be concise and direct - avoid long explanations
-- Once you have all three pieces of information, don't ask again
-- If user is vague, ask simple follow-up questions instead of guessing`
+- Be natural and conversational when collecting info
+- Don't be pushy - if they seem hesitant, continue the conversation
+- After getting all contact info, focus back on helping with their project
+- Keep responses concise and focused
+- Let the user do most of the talking about their needs
+- DON'T repeat back phone numbers or email addresses - just acknowledge and move on
+- For phone numbers: "Thanks, [name]. Got it." then continue
+- For email: "Got it." then ask for phone number`
     }
 
     const systemPrompt = `You are the Clubhaus AI assistant. You represent a creative agency that values sharp thinking, curiosity, and clarity.
@@ -545,13 +586,13 @@ Use this information to inform your responses, but speak like a sharp, curious c
 
     console.log('✅ Got response from Groq')
 
-    // Log token usage (estimate tokens since Groq API doesn't provide usage in response)
+    // Log token usage in background (non-blocking)
     try {
       const estimatedPromptTokens = conversationMessages.reduce((total, msg) => total + Math.ceil(msg.content.length / 4), 0)
       const estimatedCompletionTokens = Math.ceil(aiResponse.length / 4)
       const totalEstimatedTokens = estimatedPromptTokens + estimatedCompletionTokens
 
-      await tokenUsageService.logTokenUsage(
+      tokenUsageService.logTokenUsage(
         userId,
         sessionId,
         'llama-3.1-8b-instant',
@@ -564,7 +605,9 @@ Use this information to inform your responses, but speak like a sharp, curious c
           responseLength: aiResponse.length,
           requestId
         }
-      )
+      ).catch(error => {
+        console.error('❌ Token usage logging failed (non-blocking):', error)
+      })
 
       console.log(`📊 Estimated token usage: ${totalEstimatedTokens} total (${estimatedPromptTokens} prompt + ${estimatedCompletionTokens} completion)`)
     } catch (tokenError) {
@@ -644,29 +687,17 @@ Use this information to inform your responses, but speak like a sharp, curious c
       aiResponse = "I can't do that myself, but a Clubhaus team member will follow up to help with that."
     }
 
-    // Log the AI response
-    try {
-      await logger.logAIResponse(userId, aiResponse, {
-        sessionId,
-        projectType: detectedProjectType || 'general',
-        requestId,
-        responseTime: Date.now() - startTime
-      })
-    } catch (memoryError) {
-      console.error('❌ Failed to log AI response:', memoryError)
-      // Don't fail the request if logging fails
-    }
+    // Log the AI response in background (non-blocking)
+    logger.logAIResponse(userId, aiResponse, {
+      sessionId,
+      projectType: detectedProjectType || 'general',
+      requestId,
+      responseTime: Date.now() - startTime
+    }).catch(memoryError => {
+      console.error('❌ Failed to log AI response (non-blocking):', memoryError)
+    })
 
-    // Ensure minimum 1-second delay for strategizing bubble
-    const currentTime = Date.now()
-    const elapsedTime = currentTime - startTime
-    const minimumDelayMs = 1000 // 1 second
-    
-    if (elapsedTime < minimumDelayMs) {
-      const remainingDelay = minimumDelayMs - elapsedTime
-      console.log(`⏳ Adding ${remainingDelay}ms delay to ensure minimum 1-second strategizing time`)
-      await new Promise(resolve => setTimeout(resolve, remainingDelay))
-    }
+    // No delay - instant response
 
     const finalResponseTime = Date.now() - startTime
 

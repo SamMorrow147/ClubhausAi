@@ -495,13 +495,14 @@
   .cyberpunk-input {
     height: 50px !important; /* Larger touch target */
     padding: 0 15px !important;
-    border-radius: 8px 0 0 8px !important;
+    border-radius: 8px !important;
   }
   
   .cyberpunk-button {
     height: 50px !important; /* Match input height */
-    width: 60px !important; /* Larger touch target */
-    border-radius: 0 8px 8px 0 !important;
+    width: 50px !important; /* Circular button */
+    border-radius: 50% !important;
+    margin-left: 8px !important;
   }
   
   /* Improve touch targets for buttons */
@@ -726,18 +727,18 @@ body.light {
   background: #222;	
   background: linear-gradient(#333, #222);	
   border: 1px solid #444;
-  border-radius: 5px 0 0 5px;
+  border-radius: 5px;
   color: #888;
   display: block;
   float: left;
   font-family: inherit;
   font-size: 13px;
   font-weight: 400;
-  height: 40px;
+  height: 50px;
   margin: 0;
   padding: 0 10px;
   text-shadow: 0 -1px 0 #000;
-  width: calc(100% - 80px);
+  width: calc(100% - 58px);
   outline: none;
   position: relative;
   z-index: 1;
@@ -782,20 +783,22 @@ body.light {
   box-sizing: border-box;
   border: 1px solid #444;
   border-left-color: #000;
-  border-radius: 0 5px 5px 0;
+  border-radius: 50%;
   color: #fff;
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   float: left;
   font-family: inherit;
   font-size: 13px;
   font-weight: 400;
-  height: 40px;
-  line-height: 40px;
+  height: 50px;
   margin: 0;
+  margin-left: 8px;
   padding: 0;
   position: relative;
   text-shadow: 0 -1px 0 #000;
-  width: 80px;
+  width: 50px;
   cursor: pointer;
   transition: all 0.2s ease;
   z-index: 1;
@@ -805,7 +808,7 @@ body.light {
 .cyberpunk-button:focus {
   background: #292929;
   background: linear-gradient(#393939, #292929);
-  color: #5f5;
+  color: #60a5fa;
   outline: none;
 }
 
@@ -818,6 +821,26 @@ body.light {
 .cyberpunk-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Circular Loading Animation for Button */
+.cyberpunk-button.loading {
+  animation: rotate-360 2s linear infinite;
+  box-shadow: 0 2px 0 #3b82f6 inset, 0 0 10px 2px rgba(0, 0, 0, 0.3) inset;
+}
+
+@keyframes rotate-360 {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Light mode loader colors */
+.light .cyberpunk-button.loading {
+  box-shadow: 0 2px 0 #3b82f6 inset, 0 0 10px 2px rgba(0, 0, 0, 0.1) inset;
 }
 
 /* Light mode styling for cyberpunk form */
@@ -925,7 +948,7 @@ body.light {
 @keyframes gradient-change {
   to {
     --gradient-color-1: hsl(210 100% 59%);
-    --gradient-color-2: hsl(310 100% 59%);
+    --gradient-color-2: hsl(240 100% 59%);
   }
 }
 
@@ -962,7 +985,7 @@ body.light {
   background: linear-gradient(
     to right in oklch, 
     hsl(210 100% 59%), 
-    hsl(310 100% 59%)
+    hsl(240 100% 59%)
   );
   
   -webkit-background-clip: text;
@@ -999,6 +1022,36 @@ body.light {
 
 .gif-blur-layer.fade-out {
   opacity: 0 !important;
+}
+
+/* Fix for GIF transparency issues */
+.gif-animation-container img {
+  background: transparent !important;
+  mix-blend-mode: normal;
+}
+
+.gif-animation-container img[style*="blur"] {
+  background: transparent !important;
+  mix-blend-mode: multiply;
+}
+
+/* Ensure no background artifacts on small GIF */
+.gif-animation-container[style*="3rem"] img {
+  background: transparent !important;
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+/* Additional blur fixes for small GIF */
+.gif-animation-container[style*="3rem"] img[style*="blur"] {
+  filter: blur(1px) !important;
+  opacity: 0.3 !important;
+}
+
+/* Remove blur effects entirely for very small sizes */
+.gif-animation-container[style*="3rem"] img[style*="blur(12px)"],
+.gif-animation-container[style*="3rem"] img[style*="blur(8px)"] {
+  display: none !important;
 }
 
 /* Loading animation fixes */
@@ -1157,4 +1210,139 @@ body.light {
   animation: gradientBorder 3s ease infinite, borderGlowLight 2s ease-in-out infinite;
 } 
 
- 
+/* User Message Styling with Dark Blue Gradient */
+.user-message-dark {
+  background: linear-gradient(135deg, 
+    rgba(30, 58, 138, 0.9) 0%, 
+    rgba(30, 64, 175, 0.8) 50%, 
+    rgba(37, 99, 235, 0.7) 100%
+  );
+  color: white;
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  box-shadow: 
+    0 2px 4px rgba(0, 0, 0, 0.1),
+    0 4px 8px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Bot Message Styling with Blue Stroke to Match User Messages */
+.bot-message-dark {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+  border: 2px solid;
+  border-image: linear-gradient(135deg, 
+    rgba(59, 130, 246, 0.6) 0%, 
+    rgba(37, 99, 235, 0.5) 50%, 
+    rgba(30, 64, 175, 0.4) 100%
+  ) 1;
+  border-radius: 0.5rem;
+  box-shadow: 
+    0 2px 4px rgba(0, 0, 0, 0.1),
+    0 4px 8px rgba(0, 0, 0, 0.1),
+    0 0 8px rgba(59, 130, 246, 0.4);
+  position: relative;
+  overflow: hidden;
+}
+
+.bot-message-light {
+  background: rgba(30, 58, 138, 0.1);
+  color: rgba(30, 58, 138, 0.9);
+  border: 2px solid;
+  border-image: linear-gradient(135deg, 
+    rgba(59, 130, 246, 0.5) 0%, 
+    rgba(37, 99, 235, 0.4) 50%, 
+    rgba(30, 64, 175, 0.3) 100%
+  ) 1;
+  border-radius: 0.5rem;
+  box-shadow: 
+    0 2px 4px rgba(0, 0, 0, 0.05),
+    0 4px 8px rgba(0, 0, 0, 0.05),
+    0 0 8px rgba(59, 130, 246, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.user-message-dark::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, 
+    rgba(255, 255, 255, 0.1) 0%, 
+    rgba(255, 255, 255, 0.05) 50%, 
+    transparent 100%
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+.user-message-dark > * {
+  position: relative;
+  z-index: 2;
+}
+
+.user-message-light {
+  background: linear-gradient(135deg, 
+    rgba(30, 58, 138, 0.8) 0%, 
+    rgba(30, 64, 175, 0.7) 50%, 
+    rgba(37, 99, 235, 0.6) 100%
+  );
+  color: white;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  box-shadow: 
+    0 2px 4px rgba(0, 0, 0, 0.1),
+    0 4px 8px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  position: relative;
+  overflow: hidden;
+}
+
+.user-message-light::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, 
+    rgba(255, 255, 255, 0.15) 0%, 
+    rgba(255, 255, 255, 0.08) 50%, 
+    transparent 100%
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+.user-message-light > * {
+  position: relative;
+  z-index: 2;
+}
+
+/* Hover effects for user messages */
+.user-message-dark:hover,
+.user-message-light:hover {
+  transform: translateY(-1px);
+  box-shadow: 
+    0 4px 8px rgba(0, 0, 0, 0.15),
+    0 8px 16px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transition: all 0.2s ease;
+}
+
+/* Ensure text is readable in both themes */
+.user-message-dark a,
+.user-message-light a {
+  color: rgba(255, 255, 255, 0.9);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.user-message-dark a:hover,
+.user-message-light a:hover {
+  color: white;
+  text-decoration-thickness: 2px;
+}
