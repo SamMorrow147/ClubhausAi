@@ -99,6 +99,21 @@
     -ms-user-select: text;
     user-select: text;
   }
+  
+  /* Allow text selection on test-memory page */
+  .test-memory-page {
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+    user-select: text;
+  }
+  
+  .test-memory-page * {
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+    user-select: text;
+  }
 }
 
 /* Glowing card styles */

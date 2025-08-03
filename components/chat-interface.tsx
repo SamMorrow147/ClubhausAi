@@ -450,7 +450,7 @@ export function ChatInterface() {
                   } : false}
                   animate={hasFirstMessage ? {
                     position: 'fixed',
-                    top: '-14px',
+                    top: '0px',
                     right: '3px',
                     width: '3rem',
                     height: '3rem',
@@ -585,7 +585,7 @@ export function ChatInterface() {
                                   color: isLightMode ? '#1e3a8a' : '#ffffff',
                                   fontSize: 'inherit',
                                   fontFamily: 'inherit',
-                                  fontWeight: '500',
+                                  fontWeight: '400',
                                   position: 'relative',
                                   zIndex: 10
                                 }}>Strategizing...</span>
