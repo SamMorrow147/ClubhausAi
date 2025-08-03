@@ -1,6 +1,29 @@
 {
   "project_triggers": [
     {
+      "name": "AI Agent Introduction",
+      "tags": ["ai", "introduction", "capabilities", "assistant", "help", "support"],
+      "trigger_phrases": [
+        "what do you do",
+        "what are you",
+        "who are you",
+        "what can you do",
+        "what are you good for",
+        "what is this",
+        "who am I talking to",
+        "are you a bot"
+      ],
+      "response": {
+        "text": "I'm an AI agent developed by Clubhaus Agency to assist you. I can help you put together an RFP, connect you with someone from the team, or help you brainstorm and work through ideas. Where would you like to start?",
+        "confidence_threshold": 0.7,
+        "follow_up_questions": [
+          "Are you looking to start an RFP?",
+          "Would you like to connect with someone from our team?",
+          "What kind of project are you thinking about?"
+        ]
+      }
+    },
+    {
       "name": "Twisted Pin – Gamified Branding",
       "tags": ["bowling", "arcade", "gamification", "interactive signage", "playful UX", "brand experience"],
       "trigger_phrases": [
