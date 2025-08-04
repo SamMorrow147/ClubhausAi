@@ -10,6 +10,11 @@ export const metadata: Metadata = {
   keywords: ['AI', 'Clubhaus', 'Assistant', 'Chat', 'Agency'],
   authors: [{ name: 'Clubhaus Agency' }],
   metadataBase: new URL('https://clubhaus-ai.vercel.app'),
+  icons: {
+    icon: '/logo192.png',
+    shortcut: '/logo192.png',
+    apple: '/logo192.png',
+  },
   openGraph: {
     title: 'Clubhaus AI',
     description: 'Your personal AI assistant for all things Clubhaus',

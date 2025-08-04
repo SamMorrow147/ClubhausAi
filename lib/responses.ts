@@ -1,9 +1,11 @@
+import { projectService } from './rfpService'
+
 export interface StrategicResponse {
   triggers: string[];
   response: string | ((userMessage: string, sessionId?: string) => string);
   followUp?: string | ((userMessage: string, sessionId?: string) => string);
   nextStep?: string; // For multi-step flows
-  requiresContactInfo?: boolean; // Flag for RFP flows that need contact info first
+  requiresContactInfo?: boolean; // Flag for project flows that need contact info first
 }
 
 // Add conversation state tracking to prevent repetitive responses
@@ -29,7 +31,7 @@ export interface ConversationState {
 const conversationStates = new Map<string, ConversationState>();
 
 export const STRATEGIC_RESPONSES: StrategicResponse[] = [
-  // BASIC PROJECT DESCRIPTION PIVOT TO RFP
+  // CASUAL NOTE-TAKING OFFER
   {
     triggers: [
       "ice cream cone logo",
@@ -143,11 +145,18 @@ export const STRATEGIC_RESPONSES: StrategicResponse[] = [
       "need strategy",
       "looking for strategy"
     ],
-    response: "Got it. If you want to get a formal proposal together later, just let me know.",
+    response: function(userMessage: string) {
+      // Check if we should offer to take notes based on the user's message
+      if (projectService.shouldOfferToTakeNotes(userMessage)) {
+        return projectService.generateNoteTakingOffer(userMessage);
+      }
+      // If not ready for note-taking, give a casual response
+      return "Got it. If you want to get a formal proposal together later, just let me know.";
+    },
     followUp: "What's your business name?",
-    nextStep: "rfp_initiated"
+    nextStep: "project_initiated"
   },
-  // RFP/PROPOSAL ASSISTANCE FLOW
+  // PROJECT ASSISTANCE FLOW
   {
     triggers: [
       "help with an RFP",
@@ -171,7 +180,7 @@ export const STRATEGIC_RESPONSES: StrategicResponse[] = [
       "RFP development",
       "bid development"
     ],
-    response: "Happy to help you walk through your RFP! Let's start with a few questions to get clarity on your project.",
+    response: "Happy to help you walk through your project details! Let's start with a few questions to get clarity on your project.",
     followUp: "First, I'll need your contact information to get started. What's your name, email, and phone number?",
     requiresContactInfo: true,
     nextStep: "contact_info_collected"
@@ -1253,8 +1262,32 @@ export const STRATEGIC_RESPONSES: StrategicResponse[] = [
       "whats next",
       "next steps"
     ],
-    response: "Great! I can help walk you through building out your RFP. Let me recap what we've covered so far and then we can fill in the remaining details to give our team everything they need for a comprehensive proposal.",
-    followUp: "What's your budget range for this project? That helps us tailor the right approach and service recommendations."
+    response: function(userMessage: string, sessionId?: string) {
+      const state = conversationStates.get(sessionId || 'default');
+      const context = state?.providedContext;
+      
+      // For first exchanges, be more conversational and less formal
+      const isFirstExchange = !context || (!context.hasSignificantIntent && !context.hasGoals && !context.hasTimeline);
+      
+      if (isFirstExchange) {
+        return "Perfect! Let's start by understanding your project better. What's the main goal you're trying to achieve?";
+      } else {
+        return "Great! I can help walk you through building out your project details. Let me recap what we've covered so far and then we can fill in the remaining details to give our team everything they need for a comprehensive proposal.";
+      }
+    },
+    followUp: function(userMessage: string, sessionId?: string) {
+      const state = conversationStates.get(sessionId || 'default');
+      const context = state?.providedContext;
+      
+      // For first exchanges, ask about goals instead of budget
+      const isFirstExchange = !context || (!context.hasSignificantIntent && !context.hasGoals && !context.hasTimeline);
+      
+      if (isFirstExchange) {
+        return "What's your biggest challenge right now?";
+      } else {
+        return "What's your budget range for this project? That helps us tailor the right approach and service recommendations.";
+      }
+    }
   },
   // CONTACT INFO REQUESTS
   {
@@ -1323,7 +1356,12 @@ export const STRATEGIC_RESPONSES: StrategicResponse[] = [
       const state = conversationStates.get(sessionId || 'default');
       const context = state?.providedContext;
       
-      if (context?.hasSignificantIntent && (context.hasGoals || context.hasTimeline)) {
+      // For first exchanges, be more conversational and less formal
+      const isFirstExchange = !context || (!context.hasSignificantIntent && !context.hasGoals && !context.hasTimeline);
+      
+      if (isFirstExchange) {
+        return "Absolutely — brand strategy and design are right in our wheelhouse. Sounds like a powerful niche! Can you tell me a bit about your vision? Are you starting from scratch, or do you have anything already in place (like a name, logo, or rough idea of your audience)?";
+      } else if (context?.hasSignificantIntent && (context.hasGoals || context.hasTimeline)) {
         return "Sounds great — I can help walk you through building out your RFP based on what you've shared. Let me recap the key details we have so far and then we can fill in any gaps.";
       } else {
         return "Exciting! Early-stage startups are where we love to make an impact. What's the main goal you're trying to achieve with this launch?";
@@ -1333,7 +1371,12 @@ export const STRATEGIC_RESPONSES: StrategicResponse[] = [
       const state = conversationStates.get(sessionId || 'default');
       const context = state?.providedContext;
       
-      if (context?.hasSignificantIntent) {
+      // For first exchanges, ask about their vision instead of challenges
+      const isFirstExchange = !context || (!context.hasSignificantIntent && !context.hasGoals && !context.hasTimeline);
+      
+      if (isFirstExchange) {
+        return "What's your biggest challenge right now?";
+      } else if (context?.hasSignificantIntent) {
         return "What's the biggest challenge you're facing right now?";
       } else {
         return "Are you looking for brand identity, website, or both?";

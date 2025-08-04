@@ -9,7 +9,7 @@ import { checkProjectTriggers } from '../../../lib/projectHandler'
 import SimpleLogger from '../../../lib/simpleLogger'
 import UserProfileService from '../../../lib/userProfileService'
 import TokenUsageService from '../../../lib/tokenUsageService'
-import { rfpService } from '../../../lib/rfpService'
+import { projectService } from '../../../lib/rfpService'
 import { callGroqWithRetry, getRateLimitErrorMessage } from '../../../lib/groqRetry'
 
 // Create Groq provider instance
@@ -269,10 +269,10 @@ export async function POST(req: Request) {
       console.log('⚡ Skipping user profile checks for fast first message')
     }
 
-    // Contact capture on 5th bot message (moved from 3rd to allow more value delivery first)
-    const isFifthBotMessage = botMessageCount === 4 // This will be the 5th bot message
-    if (isFifthBotMessage) {
-      console.log('🎯 5th bot message detected - triggering contact capture')
+    // Contact capture on 8th bot message (moved from 5th to allow much more natural conversation first)
+    const isEighthBotMessage = botMessageCount === 7 // This will be the 8th bot message
+    if (isEighthBotMessage) {
+      console.log('🎯 8th bot message detected - considering contact capture')
       
       // Check if we already have contact info to avoid being pushy
       const hasContact = userProfile && (userProfile.email || userProfile.phone)
@@ -285,7 +285,7 @@ export async function POST(req: Request) {
         log.content?.toLowerCase().includes('what\'s your name')
       )
       
-      // Only ask for contact if we've provided value first and they seem engaged
+      // Only ask for contact if user has shown significant engagement and interest
       const userHasAskedQuestions = sessionLogs.some(log => 
         log.role === 'user' && log.content?.includes('?')
       )
@@ -294,10 +294,11 @@ export async function POST(req: Request) {
       const conversationState = getConversationState(sessionId)
       const hasSignificantIntent = conversationState?.providedContext?.hasSignificantIntent
       
-      if (!hasContact && !hasAskedForContact && userHasAskedQuestions && !hasSignificantIntent) {
+      // Only ask if user seems genuinely interested and engaged
+      const userIsEngaged = sessionLogs.filter(log => log.role === 'user').length >= 3
+      
+      if (!hasContact && !hasAskedForContact && userHasAskedQuestions && !hasSignificantIntent && userIsEngaged) {
         const contactCaptureMessage = "I'd love to have one of our strategists follow up with some specific ideas for your project. What's your name?"
-        
-        // No delay - instant response
         
         // Log the contact capture response in background (non-blocking)
         logger.logAIResponse(userId, contactCaptureMessage, {
@@ -315,8 +316,8 @@ export async function POST(req: Request) {
         return new Response(
           JSON.stringify({ 
             message: contactCaptureMessage,
-            context: 'Contact capture on 5th message',
-            debug: { requestId, responseType: 'CONTACT_CAPTURE', responseTime: Date.now() - startTime, messageNumber: 5 }
+            context: 'Contact capture on 8th message',
+            debug: { requestId, responseType: 'CONTACT_CAPTURE', responseTime: Date.now() - startTime, messageNumber: 8 }
           }),
           { 
             status: 200, 
@@ -328,9 +329,10 @@ export async function POST(req: Request) {
       }
     }
 
-    // RFP pivot on 7th bot message - offer to build proper RFP
-    if (isSeventhMessage) {
-      console.log('🎯 7th bot message detected - triggering RFP pivot')
+    // RFP pivot on 10th bot message - offer to build proper RFP (moved from 7th to allow more natural conversation)
+    const isTenthMessage = botMessageCount === 9 // This will be the 10th bot message
+    if (isTenthMessage) {
+      console.log('🎯 10th bot message detected - considering RFP pivot')
       
       // Check if we've already offered RFP in this session
       const sessionLogs = await logger.getLogsBySession(sessionId)
@@ -340,17 +342,17 @@ export async function POST(req: Request) {
         log.content?.toLowerCase().includes('rfp')
       )
       
-      // Check if user has given a basic project description (not already in RFP flow)
-      const currentRFPFlow = rfpService.getFlowState(sessionId)
+      // Check if user has given a basic project description (not already in project flow)
+      const currentProjectFlow = projectService.getFlowState(sessionId)
       const hasBasicProjectDescription = lastMessage.content.length > 10 && 
-        !currentRFPFlow?.isActive &&
+        !currentProjectFlow?.isActive &&
         !lastMessage.content.toLowerCase().includes('yes') &&
         !lastMessage.content.toLowerCase().includes('no') &&
         !lastMessage.content.toLowerCase().includes('thanks') &&
         !lastMessage.content.toLowerCase().includes('thank you')
       
-      // Check if RFP is already complete (don't re-offer)
-      const isRFPComplete = currentRFPFlow && rfpService.isRFPComplete(currentRFPFlow)
+      // Check if project is already complete (don't re-offer)
+      const isProjectComplete = currentProjectFlow && projectService.isProjectComplete(currentProjectFlow)
       
       // Check if user is being casual (avoid RFP for casual users)
       const isCasualUser = lastMessage.content.toLowerCase().includes('eh') ||
@@ -359,7 +361,10 @@ export async function POST(req: Request) {
                           lastMessage.content.toLowerCase().includes('not a big') ||
                           lastMessage.content.toLowerCase().includes('haven\'t really')
       
-      if (hasBasicProjectDescription && !hasOfferedRFP && !isCasualUser && !isRFPComplete) {
+      // Only offer RFP if user seems genuinely interested and engaged
+      const userIsEngaged = sessionLogs.filter(log => log.role === 'user').length >= 4
+      
+      if (hasBasicProjectDescription && !hasOfferedRFP && !isCasualUser && !isProjectComplete && userIsEngaged) {
         const rfpPivotMessage = "Sounds good. If you want to get a formal proposal together later, just let me know."
         
         // Log the RFP pivot response in background (non-blocking)
@@ -378,8 +383,8 @@ export async function POST(req: Request) {
         return new Response(
           JSON.stringify({ 
             message: rfpPivotMessage,
-            context: 'RFP pivot on 7th message',
-            debug: { requestId, responseType: 'RFP_PIVOT', responseTime: Date.now() - startTime, messageNumber: 7 }
+            context: 'RFP pivot on 10th message',
+            debug: { requestId, responseType: 'RFP_PIVOT', responseTime: Date.now() - startTime, messageNumber: 10 }
           }),
           { 
             status: 200, 
@@ -403,10 +408,10 @@ export async function POST(req: Request) {
         
         // Extract existing information from the conversation
         const conversationHistory = messages.map(msg => msg.content);
-        const existingInfo = rfpService.extractExistingInfo(lastMessage.content, userProfile, conversationHistory)
+        const existingInfo = projectService.extractExistingInfo(lastMessage.content, userProfile, conversationHistory)
         
-        // Start RFP flow with existing information
-        rfpService.startRFPFlow(sessionId, existingInfo)
+        // Start project flow with existing information
+        projectService.startProjectFlow(sessionId, existingInfo)
         
         const formattedResponse = formatStrategicResponse(strategicResponse, lastMessage.content, sessionId)
         
@@ -460,55 +465,55 @@ export async function POST(req: Request) {
       }
     }
 
-    // Check for RFP flow
-    const currentRFPFlow = rfpService.getFlowState(sessionId)
+    // Check for project flow
+    const currentProjectFlow = projectService.getFlowState(sessionId)
     
-    if (currentRFPFlow && currentRFPFlow.isActive) {
-      console.log('📋 RFP flow active, step:', currentRFPFlow.step)
+    if (currentProjectFlow && currentProjectFlow.isActive) {
+      console.log('📋 Project flow active, step:', currentProjectFlow.step)
       
       // Add user response to track repetitive behavior
-      rfpService.addUserResponse(sessionId, lastMessage.content)
+      projectService.addUserResponse(sessionId, lastMessage.content)
       
       // Check if we should skip this step due to repetitive responses
-      if (rfpService.shouldSkipStep(sessionId)) {
+      if (projectService.shouldSkipStep(sessionId)) {
         console.log('⚠️ User being repetitive, skipping to next step')
         // Force advance to next step
-        switch (currentRFPFlow.step) {
+        switch (currentProjectFlow.step) {
           case 'contact_info':
-            rfpService.updateContactInfo(sessionId, { name: 'Not provided', email: 'not@provided.com', phone: '000-000-0000' })
+            projectService.updateContactInfo(sessionId, { name: 'Not provided', email: 'not@provided.com', phone: '000-000-0000' })
             break
           case 'service_type':
-            rfpService.updateServiceType(sessionId, 'General services')
+            projectService.updateServiceType(sessionId, 'General services')
             break
           case 'timeline':
-            rfpService.updateTimeline(sessionId, 'Flexible timeline')
+            projectService.updateTimeline(sessionId, 'Flexible timeline')
             break
           case 'budget':
-            rfpService.updateBudget(sessionId, 'Budget to be determined')
+            projectService.updateBudget(sessionId, 'Budget to be determined')
             break
           case 'goals':
-            rfpService.updateGoals(sessionId, 'General project goals')
+            projectService.updateGoals(sessionId, 'General project goals')
             break
         }
         // Get updated flow state
-        const updatedFlow = rfpService.getFlowState(sessionId)
+        const updatedFlow = projectService.getFlowState(sessionId)
         if (updatedFlow) {
-          currentRFPFlow.step = updatedFlow.step
+          currentProjectFlow.step = updatedFlow.step
         }
       }
       
-      // Handle different RFP flow steps
-      switch (currentRFPFlow.step) {
+      // Handle different project flow steps
+      switch (currentProjectFlow.step) {
         case 'contact_info':
           // Extract contact info from user message
-          const contactInfo = rfpService.extractContactInfo(lastMessage.content)
+          const contactInfo = projectService.extractContactInfo(lastMessage.content)
           if (contactInfo) {
-            rfpService.updateContactInfo(sessionId, contactInfo)
+            projectService.updateContactInfo(sessionId, contactInfo)
             return new Response(
               JSON.stringify({
                 message: "Great! What type of service or product are you requesting a proposal for?",
-                context: 'RFP flow - contact info collected',
-                debug: { requestId, responseType: 'RFP_CONTACT_COLLECTED', responseTime: Date.now() - startTime }
+                context: 'Project flow - contact info collected',
+                debug: { requestId, responseType: 'PROJECT_CONTACT_COLLECTED', responseTime: Date.now() - startTime }
               }),
               { status: 200, headers: { 'Content-Type': 'application/json' } }
             )
@@ -516,26 +521,26 @@ export async function POST(req: Request) {
             return new Response(
               JSON.stringify({
                 message: "I need your name, email, and phone number to get started. Could you provide those?",
-                context: 'RFP flow - contact info needed',
-                debug: { requestId, responseType: 'RFP_CONTACT_NEEDED', responseTime: Date.now() - startTime }
+                context: 'Project flow - contact info needed',
+                debug: { requestId, responseType: 'PROJECT_CONTACT_NEEDED', responseTime: Date.now() - startTime }
               }),
               { status: 200, headers: { 'Content-Type': 'application/json' } }
             )
           }
           
         case 'service_type':
-          rfpService.updateServiceType(sessionId, lastMessage.content)
+          projectService.updateServiceType(sessionId, lastMessage.content)
           
           // Check if timeline has already been provided
-          if (rfpService.hasInformationBeenProvided(currentRFPFlow, 'timeline')) {
+          if (projectService.hasInformationBeenProvided(currentProjectFlow, 'timeline')) {
             // Skip to budget if timeline is already known
-            currentRFPFlow.step = 'budget'
-            rfpService.updateBudget(sessionId, lastMessage.content)
+            currentProjectFlow.step = 'budget'
+            projectService.updateBudget(sessionId, lastMessage.content)
             return new Response(
               JSON.stringify({
                 message: "Thanks! Do you already have a budget range or cap in mind?",
-                context: 'RFP flow - service type collected, timeline already known',
-                debug: { requestId, responseType: 'RFP_SERVICE_COLLECTED_SKIP_TIMELINE', responseTime: Date.now() - startTime }
+                context: 'Project flow - service type collected, timeline already known',
+                debug: { requestId, responseType: 'PROJECT_SERVICE_COLLECTED_SKIP_TIMELINE', responseTime: Date.now() - startTime }
               }),
               { status: 200, headers: { 'Content-Type': 'application/json' } }
             )
@@ -544,25 +549,25 @@ export async function POST(req: Request) {
           return new Response(
             JSON.stringify({
               message: "Got it. What's your ideal timeline or deadline for this project?",
-              context: 'RFP flow - service type collected',
-              debug: { requestId, responseType: 'RFP_SERVICE_COLLECTED', responseTime: Date.now() - startTime }
+              context: 'Project flow - service type collected',
+              debug: { requestId, responseType: 'PROJECT_SERVICE_COLLECTED', responseTime: Date.now() - startTime }
             }),
             { status: 200, headers: { 'Content-Type': 'application/json' } }
           )
           
         case 'timeline':
-          rfpService.updateTimeline(sessionId, lastMessage.content)
+          projectService.updateTimeline(sessionId, lastMessage.content)
           
           // Check if budget has already been provided
-          if (rfpService.hasInformationBeenProvided(currentRFPFlow, 'budget')) {
+          if (projectService.hasInformationBeenProvided(currentProjectFlow, 'budget')) {
             // Skip to goals if budget is already known
-            currentRFPFlow.step = 'goals'
-            rfpService.updateGoals(sessionId, lastMessage.content)
+            currentProjectFlow.step = 'goals'
+            projectService.updateGoals(sessionId, lastMessage.content)
             return new Response(
               JSON.stringify({
                 message: "Understood. What outcomes or goals are you hoping this project achieves? (e.g., increased sales, better UX, new product launch, rebranding)",
-                context: 'RFP flow - timeline collected, budget already known',
-                debug: { requestId, responseType: 'RFP_TIMELINE_COLLECTED_SKIP_BUDGET', responseTime: Date.now() - startTime }
+                context: 'Project flow - timeline collected, budget already known',
+                debug: { requestId, responseType: 'PROJECT_TIMELINE_COLLECTED_SKIP_BUDGET', responseTime: Date.now() - startTime }
               }),
               { status: 200, headers: { 'Content-Type': 'application/json' } }
             )
@@ -571,29 +576,28 @@ export async function POST(req: Request) {
           return new Response(
             JSON.stringify({
               message: "Thanks! Do you already have a budget range or cap in mind?",
-              context: 'RFP flow - timeline collected',
-              debug: { requestId, responseType: 'RFP_TIMELINE_COLLECTED', responseTime: Date.now() - startTime }
+              context: 'Project flow - timeline collected',
+              debug: { requestId, responseType: 'PROJECT_TIMELINE_COLLECTED', responseTime: Date.now() - startTime }
             }),
             { status: 200, headers: { 'Content-Type': 'application/json' } }
           )
           
         case 'budget':
-          rfpService.updateBudget(sessionId, lastMessage.content)
+          projectService.updateBudget(sessionId, lastMessage.content)
           
           // Check if goals have already been provided
-          if (rfpService.hasInformationBeenProvided(currentRFPFlow, 'goals')) {
-            // Skip to proposal format if goals are already known
-            currentRFPFlow.step = 'proposal_format'
-            rfpService.updateProposalFormat(sessionId, lastMessage.content)
-            const rfpData = rfpService.completeRFPFlow(sessionId)
-            if (rfpData) {
-              const summary = rfpService.generateProposalSummary(rfpData)
+          if (projectService.hasInformationBeenProvided(currentProjectFlow, 'goals')) {
+            // Skip to complete if goals are already known
+            currentProjectFlow.step = 'complete'
+            const projectData = projectService.completeProjectFlow(sessionId)
+            if (projectData) {
+              const summary = projectService.generateProjectSummary(projectData)
               return new Response(
                 JSON.stringify({
                   message: summary,
-                  context: 'RFP flow - budget collected, goals already known',
-                  rfpData,
-                  debug: { requestId, responseType: 'RFP_BUDGET_COLLECTED_SKIP_GOALS', responseTime: Date.now() - startTime }
+                  context: 'Project flow - budget collected, goals already known',
+                  projectData,
+                  debug: { requestId, responseType: 'PROJECT_BUDGET_COLLECTED_SKIP_GOALS', responseTime: Date.now() - startTime }
                 }),
                 { status: 200, headers: { 'Content-Type': 'application/json' } }
               )
@@ -603,91 +607,46 @@ export async function POST(req: Request) {
           return new Response(
             JSON.stringify({
               message: "Understood. What outcomes or goals are you hoping this project achieves? (e.g., increased sales, better UX, new product launch, rebranding)",
-              context: 'RFP flow - budget collected',
-              debug: { requestId, responseType: 'RFP_BUDGET_COLLECTED', responseTime: Date.now() - startTime }
+              context: 'Project flow - budget collected',
+              debug: { requestId, responseType: 'PROJECT_BUDGET_COLLECTED', responseTime: Date.now() - startTime }
             }),
             { status: 200, headers: { 'Content-Type': 'application/json' } }
           )
           
         case 'goals':
-          rfpService.updateGoals(sessionId, lastMessage.content)
+          projectService.updateGoals(sessionId, lastMessage.content)
           
-          // Check if user is agreeing to format the proposal
-          const userMessageLower = lastMessage.content.toLowerCase();
-          const isAgreeingToFormat = userMessageLower.includes('yes') || 
-                                   userMessageLower.includes('yeah') || 
-                                   userMessageLower.includes('sure') || 
-                                   userMessageLower.includes('ok') || 
-                                   userMessageLower.includes('okay') ||
-                                   userMessageLower.includes('format') ||
-                                   userMessageLower.includes('proposal');
-          
-          if (isAgreeingToFormat) {
-            // User agreed to format, so complete the RFP
-            const rfpData = rfpService.completeRFPFlow(sessionId);
-            if (rfpData) {
-              const summary = rfpService.generateProposalSummary(rfpData);
-              return new Response(
-                JSON.stringify({
-                  message: summary,
-                  context: 'RFP flow - completed after agreement',
-                  rfpData,
-                  debug: { requestId, responseType: 'RFP_COMPLETED_AFTER_AGREEMENT', responseTime: Date.now() - startTime }
-                }),
-                { status: 200, headers: { 'Content-Type': 'application/json' } }
-              )
-            }
-          }
-          
-          // Check if we've already asked for format to prevent repetition
-          if (currentRFPFlow.hasAskedForFormat) {
-            // We've already asked, so complete the RFP
-            const rfpData = rfpService.completeRFPFlow(sessionId);
-            if (rfpData) {
-              const summary = rfpService.generateProposalSummary(rfpData);
-              return new Response(
-                JSON.stringify({
-                  message: summary,
-                  context: 'RFP flow - completed (already asked for format)',
-                  rfpData,
-                  debug: { requestId, responseType: 'RFP_COMPLETED_ALREADY_ASKED', responseTime: Date.now() - startTime }
-                }),
-                { status: 200, headers: { 'Content-Type': 'application/json' } }
-              )
-            }
-          }
-          
-          // Complete the RFP automatically since we're just collecting info, not creating documents
-          const completedRfpData = rfpService.completeRFPFlow(sessionId);
-          if (completedRfpData) {
-            const summary = rfpService.generateProposalSummary(completedRfpData);
+          // Complete the project automatically since we're just collecting info
+          const completedProjectData = projectService.completeProjectFlow(sessionId);
+          if (completedProjectData) {
+            const summary = projectService.generateProjectSummary(completedProjectData);
             return new Response(
               JSON.stringify({
                 message: summary,
-                context: 'RFP flow - completed automatically',
-                rfpData: completedRfpData,
-                debug: { requestId, responseType: 'RFP_COMPLETED_AUTO', responseTime: Date.now() - startTime }
+                context: 'Project flow - completed automatically',
+                projectData: completedProjectData,
+                debug: { requestId, responseType: 'PROJECT_COMPLETED_AUTO', responseTime: Date.now() - startTime }
               }),
               { status: 200, headers: { 'Content-Type': 'application/json' } }
             )
           }
           
-                  case 'proposal_format':
-            // This case should no longer be reached since we complete automatically after goals
-            const fallbackRfpData = rfpService.completeRFPFlow(sessionId)
-            if (fallbackRfpData) {
-              const summary = rfpService.generateProposalSummary(fallbackRfpData)
-              return new Response(
-                JSON.stringify({
-                  message: summary,
-                  context: 'RFP flow - completed (fallback)',
-                  rfpData: fallbackRfpData,
-                  debug: { requestId, responseType: 'RFP_COMPLETED_FALLBACK', responseTime: Date.now() - startTime }
-                }),
-                { status: 200, headers: { 'Content-Type': 'application/json' } }
-              )
-            }
-            break
+        case 'complete':
+          // This case should no longer be reached since we complete automatically after goals
+          const fallbackProjectData = projectService.completeProjectFlow(sessionId)
+          if (fallbackProjectData) {
+            const summary = projectService.generateProjectSummary(fallbackProjectData)
+            return new Response(
+              JSON.stringify({
+                message: summary,
+                context: 'Project flow - completed (fallback)',
+                projectData: fallbackProjectData,
+                debug: { requestId, responseType: 'PROJECT_COMPLETED_FALLBACK', responseTime: Date.now() - startTime }
+              }),
+              { status: 200, headers: { 'Content-Type': 'application/json' } }
+            )
+          }
+          break
       }
     }
 
@@ -697,7 +656,7 @@ export async function POST(req: Request) {
     const isNoResponse = userMessageLower.includes('no') || userMessageLower.includes('not') || userMessageLower.includes('maybe later') || userMessageLower.includes('not right now')
     
     // Check if this is likely a response to the RFP pivot (based on message count and content)
-    const isLikelyRFPPivotResponse = botMessageCount >= 6 && (isYesResponse || isNoResponse)
+    const isLikelyRFPPivotResponse = botMessageCount >= 9 && (isYesResponse || isNoResponse)
     
     if (isLikelyRFPPivotResponse) {
       if (isYesResponse) {
@@ -705,31 +664,31 @@ export async function POST(req: Request) {
         
         // Extract existing information from the conversation
         const conversationHistory = messages.map(msg => msg.content);
-        const existingInfo = rfpService.extractExistingInfo(lastMessage.content, userProfile, conversationHistory)
+        const existingInfo = projectService.extractExistingInfo(lastMessage.content, userProfile, conversationHistory)
         
-        // Start RFP flow with existing information
-        rfpService.startRFPFlow(sessionId, existingInfo)
+        // Start project flow with existing information
+        projectService.startProjectFlow(sessionId, existingInfo)
         
         // Generate smart start message that acknowledges existing info
-        const rfpStartMessage = rfpService.generateSmartStartMessage(existingInfo, userProfile)
+        const projectStartMessage = projectService.generateSmartStartMessage(existingInfo, userProfile)
         
         return new Response(
           JSON.stringify({
-            message: rfpStartMessage,
-            context: 'RFP flow started after user agreed',
-            debug: { requestId, responseType: 'RFP_STARTED_AFTER_AGREEMENT', responseTime: Date.now() - startTime }
+            message: projectStartMessage,
+            context: 'Project flow started after user agreed',
+            debug: { requestId, responseType: 'PROJECT_STARTED_AFTER_AGREEMENT', responseTime: Date.now() - startTime }
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } }
         )
       } else {
-        console.log('❌ User declined RFP process')
-        const rfpDeclineMessage = "Got it. If you want to get a formal proposal together later, just let me know."
+        console.log('❌ User declined project process')
+        const projectDeclineMessage = "Got it. If you want to get a formal proposal together later, just let me know."
         
         return new Response(
           JSON.stringify({
-            message: rfpDeclineMessage,
-            context: 'RFP declined, offering future option',
-            debug: { requestId, responseType: 'RFP_DECLINED', responseTime: Date.now() - startTime }
+            message: projectDeclineMessage,
+            context: 'Project declined, offering future option',
+            debug: { requestId, responseType: 'PROJECT_DECLINED', responseTime: Date.now() - startTime }
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } }
         )
@@ -755,7 +714,13 @@ export async function POST(req: Request) {
 
     // Construct the system prompt with context
     let projectGuidance = ''
-    if (detectedProjectType) {
+    
+    // Only add project guidance for more specific requests, not simple "help" messages
+    const isSimpleHelpRequest = lastMessage.content.toLowerCase().includes('help') && 
+                               lastMessage.content.length < 50 &&
+                               !detectedProjectType
+    
+    if (detectedProjectType && !isSimpleHelpRequest) {
       const projectQuestions = getProjectQuestions(detectedProjectType)
       projectGuidance = `
 
@@ -766,6 +731,11 @@ ${projectQuestions.map((q, i) => `${i + 1}. ${q}`).join('\n')}
 Acknowledge their request naturally, then ask 1-2 of these questions. Keep it conversational and under 80 words.`
     }
 
+    // Check if this is a first exchange (simple help request)
+    const isFirstExchange = botMessageCount === 0 && 
+                           lastMessage.content.toLowerCase().includes('help') && 
+                           lastMessage.content.length < 50
+    
     // User information collection guidance - enhanced for post-contact-capture flow
     let userInfoGuidance = ''
     if (!userInfoStatus.isComplete) {
@@ -801,31 +771,33 @@ Acknowledge their request naturally, then ask 1-2 of these questions. Keep it co
       })
       
       userInfoGuidance = `
-🎯 USER INFORMATION COLLECTION (Post Contact-Capture Flow):
+🎯 USER INFORMATION COLLECTION (Natural Flow):
 Missing user info: ${missingInfo.join(', ')}
 
-${justProvidedName && !userInfoStatus.hasEmail ? '✅ Got name! Now ask: "What\'s your email so we can send over some ideas?"' : ''}
-${justProvidedEmail && !userInfoStatus.hasPhone ? '✅ Got email! Now ask: "And what\'s the best number to reach you at?"' : ''}
+${isFirstExchange ? '🎯 FIRST EXCHANGE: Keep it warm and conversational. Don\'t mention RFPs or formal processes.' : ''}
+${justProvidedName && !userInfoStatus.hasEmail ? '✅ Got name! Continue conversation naturally - don\'t immediately ask for email.' : ''}
+${justProvidedEmail && !userInfoStatus.hasPhone ? '✅ Got email! Continue conversation naturally - don\'t immediately ask for phone.' : ''}
 ${justProvidedPhone ? '✅ Got all contact info! Thank them briefly and continue the conversation naturally.' : ''}
-${providedInvalidEmail ? '❌ Invalid email provided. Ask: "I didn\'t catch a valid email address there. Could you share your email address so we can follow up?"' : ''}
+${providedInvalidEmail ? '❌ Invalid email provided. Continue conversation naturally - don\'t immediately ask for valid email.' : ''}
 
-CONTACT CAPTURE FLOW (After 3rd message):
-- Message 3: "Before we dive deeper, let me get your name and contact info..."
-- Follow-up 1: If they give name → ask for email
-- Follow-up 2: If they give email → ask for phone  
-- Follow-up 3: Thank them briefly and continue conversation
+NATURAL CONVERSATION FLOW:
+- Focus on being helpful and answering questions first
+- Only collect contact info when it feels natural and appropriate
+- Don't be pushy or aggressive about collecting information
+- Let the conversation flow naturally
+- If user provides contact info, acknowledge briefly and continue helping them
+- Don't immediately ask for more contact info after getting one piece
 
 Guidelines:
 - Be natural and conversational when collecting info
 - Don't be pushy - if they seem hesitant, continue the conversation
-- After getting all contact info, focus back on helping with their project
+- After getting contact info, focus back on helping with their project
 - Keep responses concise and focused
 - Let the user do most of the talking about their needs
 - DON'T repeat back phone numbers or email addresses - just acknowledge and move on
 - For phone numbers: "Thanks, [name]. Got it." then continue
-- For email: "Got it." then ask for phone number
-- If user provides invalid email-like text, politely ask for a valid email address
-- FOLLOW THIS ORDER: Name → Email → Phone → Business Name → What you offer → Timeline → Budget
+- For email: "Got it." then continue conversation naturally
+- If user provides invalid email-like text, continue conversation naturally
 - NEVER ask "What's your brand story?" or "What's your main goal?" - these are banned questions
 - NEVER ask strategic questions like "What are you working on next?" or "Any tips for launching smoothly?" - you're a concierge, not a coach
 - NEVER give unsolicited advice or coaching - only answer direct questions
@@ -833,7 +805,6 @@ Guidelines:
 - NEVER ask about timelines, deadlines, or project goals unless the user specifically asks about them
 - NEVER ask "What's your ideal timeline?" or "What's your deadline?" - these are coaching questions
 - NEVER ask "What are your goals?" or "What are you hoping to achieve?" - these are strategic questions
-- Focus on collecting: Name → Email → Phone → Business Name → What you offer
 - Only ask about timeline/budget if user specifically mentions them first
 - NEVER give specific pricing estimates like "$2,500" or "$10,000" (but hourly rate of $150/hour is okay)
 - NEVER say "usually works out to $X" or similar pricing estimates
@@ -841,7 +812,11 @@ Guidelines:
 - NEVER give specific timeline estimates like "4-6 weeks" or "8-12 weeks"
 - NEVER say "A typical project takes X weeks" or similar timeline estimates
 - NEVER provide specific timeline estimates to clients - only say timeline varies based on scope and complexity
-- If asked about pricing, say: "We offer different packages to fit various project scopes and budgets. Our team will work with you to create a custom quote that fits your specific needs and goals."
+- NEVER jump to pricing unless user specifically asks about costs
+- NEVER ask about budget in first few exchanges unless user brings it up
+- NEVER give information dumps about services or processes unless specifically asked
+- NEVER use sales pitch language like "We'd love to create..." or "comprehensive package"
+- If asked about pricing, say: "We can scale things based on your needs — from a simple launch kit to a full brand rollout. Our team will work with you to create a custom quote that fits your specific needs and goals."
 - If asked about timeline, say: "Timeline depends on the scope and complexity of your project. We'll work with you to create a customized project plan that meets your needs and timeline."
 
 🚫 CRITICAL: NEVER mention HubSpot, any CRM platforms, or third-party certifications. If asked about accreditations, ONLY mention:
@@ -945,7 +920,7 @@ Use this information to inform your responses, but speak like a sharp, curious c
 
 🧠 Core Tone:
 - Only say "Welcome to the club" on the first message in a new conversation. Don't repeat it after that — it gets awkward.
-- After saying "Welcome to the club", if the user responds with "thanks" or similar, simply ask "What's your business name?" or "How can I help you today?"
+- After saying "Welcome to the club", if the user responds with "thanks" or similar, simply ask "How can I help you today?" or "What are you working on?" - don't immediately ask for business names
 - Speak naturally, like a helpful assistant — be HELPFUL, not a gatekeeper
 - Your role is lead collector and conversation facilitator only — not strategist or designer
 - Be short, smart, and human — not robotic or overly polished
@@ -956,7 +931,7 @@ Use this information to inform your responses, but speak like a sharp, curious c
 - Ask ONE simple follow-up question when needed — avoid stacked questions
 - Use casual first-person phrasing like "I can help with that," "Happy to explain," etc.
 - Avoid forced or gimmicky phrases like "you're part of the club" or similar themed taglines
-- Use natural, conversational intros like "Hey there — how can I help?" or "What's your business name?"
+- Use natural, conversational intros like "Hey there — how can I help?" or "What are you working on?"
 - Establish value and understand needs FIRST, then consider contact information
 - Stay relevant to what the user is actually asking about - don't bring up unrelated topics
 - If user is brief/vague after 2-3 exchanges, STOP asking questions and offer to connect with a human strategist
@@ -972,19 +947,41 @@ Use this information to inform your responses, but speak like a sharp, curious c
 - RESPECT JOKES AND SARCASM: If user makes a sarcastic comment, acknowledge it briefly and redirect
 - NO ASSUMPTIONS: Don't suggest creative direction or strategy based on loose interpretation
 - NEVER ASK "What's your brand story?" - This question is banned. Use timeline, goals, or audience questions instead
-- FOLLOW PROPER QUESTION ORDER: Name → Email → Business Name → What you offer → Timeline → Budget
-- NEVER ask timeline first - collect name and email before timeline
 - NEVER ask strategic questions like "What are you working on next?" or "Any tips for launching smoothly?" - you're a concierge, not a coach
 - NEVER give unsolicited advice or coaching - only answer direct questions
 - If user says they're done or have what they need, simply acknowledge and wrap up: "Got it — your info's saved. We'll follow up soon. Appreciate you!"
 - NEVER ask about timelines, deadlines, or project goals unless the user specifically asks about them
 - NEVER ask "What's your ideal timeline?" or "What's your deadline?" - these are coaching questions
 - NEVER ask "What are your goals?" or "What are you hoping to achieve?" - these are strategic questions
-- Focus on collecting: Name → Email → Phone → Business Name → What you offer
 - Only ask about timeline/budget if user specifically mentions them first
 - NEVER dismiss or question business names - accept whatever name the user provides
 - NEVER say "that's not a business name" or similar dismissive language
 - Accept business names as provided, even if they seem unusual or brief
+- DON'T aggressively collect contact info - let the conversation flow naturally
+- Focus on being helpful first, contact collection second
+
+🎯 FIRST EXCHANGE PROTOCOL:
+- For simple "help" requests or initial conversations, be warm and inviting
+- Don't jump into formal business language or RFP talk
+- Ask simple, curious questions about their project or business
+- Keep responses under 60 words for first exchanges
+- Use phrases like "Sounds great!" or "Absolutely!" to show enthusiasm
+- Ask "Can you tell me a bit about your vision?" or "What are you working on?"
+- Don't mention RFPs, proposals, or formal processes in first exchanges
+- Focus on understanding their needs, not collecting information
+
+🎯 CONVERSATION GUIDELINES:
+- Stay conversational, not salesy
+- Don't jump to pricing unless user specifically asks
+- Don't give information dumps about services or processes
+- Ask follow-up questions about their specific project
+- Let them talk more than you do
+- Mirror their tone and energy
+- Don't use polished sales language like "We'd love to create..." or "comprehensive package"
+- Focus on listening and understanding, not presenting packages
+- Keep responses concise and focused on the user's specific question
+- Don't overwhelm with multiple questions or options at once
+- Avoid long explanations unless specifically requested
 
 🚫 CRITICAL: NEVER mention HubSpot, any CRM platforms, or third-party certifications. If asked about accreditations, ONLY mention:
 - Silver Award for Best Web Design, Minnesota's Best Award

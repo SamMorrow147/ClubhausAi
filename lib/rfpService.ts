@@ -5,38 +5,85 @@ export interface ContactInfo {
   company?: string;
 }
 
-export interface RFPFlowState {
+export interface ProjectFlowState {
   step: string;
   contactInfo?: ContactInfo;
   serviceType?: string;
   timeline?: string;
   budget?: string;
   goals?: string;
-  proposalFormat?: string;
   isActive: boolean;
   lastQuestionTime?: number;
   questionRepeatCount?: number;
   userResponses: string[];
-  hasAskedForFormat?: boolean; // Track if we've already asked about proposal format
+  userHasStatedGoal?: boolean;
+  userHasMentionedProductOrService?: boolean;
+  userSeemsCooperative?: boolean;
 }
 
-export interface RFPData {
+export interface ProjectData {
   contactInfo: ContactInfo;
   serviceType: string;
   timeline: string;
   budget: string;
   goals: string;
-  proposalFormat?: string;
 }
 
-class RFPService {
-  private flowStates: Map<string, RFPFlowState> = new Map();
+class ProjectService {
+  private flowStates: Map<string, ProjectFlowState> = new Map();
 
   /**
-   * Start RFP flow for a user session
+   * Check if user has clearly stated a goal
    */
-  startRFPFlow(sessionId: string, existingInfo?: Partial<RFPData>): RFPFlowState {
-    const flowState: RFPFlowState = {
+  private hasStatedGoal(userMessage: string): boolean {
+    const messageLower = userMessage.toLowerCase();
+    const goalIndicators = [
+      'building', 'creating', 'launching', 'starting', 'developing',
+      'want to', 'need to', 'looking to', 'trying to', 'hoping to',
+      'goal is', 'objective is', 'aiming to', 'planning to',
+      'sell', 'market', 'promote', 'advertise', 'brand',
+      'website', 'app', 'platform', 'service', 'product'
+    ];
+    
+    return goalIndicators.some(indicator => messageLower.includes(indicator));
+  }
+
+  /**
+   * Check if user has mentioned a specific product or service
+   */
+  private hasMentionedProductOrService(userMessage: string): boolean {
+    const messageLower = userMessage.toLowerCase();
+    const productIndicators = [
+      'logo', 'website', 'branding', 'marketing', 'social media',
+      'advertising', 'design', 'development', 'app', 'platform',
+      'service', 'product', 'business', 'company', 'startup',
+      'restaurant', 'shop', 'store', 'consulting', 'coaching',
+      'software', 'tool', 'app', 'platform', 'service'
+    ];
+    
+    return productIndicators.some(indicator => messageLower.includes(indicator));
+  }
+
+  /**
+   * Check if user seems cooperative (not confused or brushing off)
+   */
+  private seemsCooperative(userMessage: string): boolean {
+    const messageLower = userMessage.toLowerCase();
+    const uncooperativeIndicators = [
+      'not sure', 'i dont know', 'idk', 'maybe', 'i guess',
+      'dunno', 'not really', 'just curious', 'just asking',
+      'no rush', 'not ready', 'later', 'sometime', 'maybe later',
+      'not now', 'not yet', 'still thinking', 'still deciding'
+    ];
+    
+    return !uncooperativeIndicators.some(indicator => messageLower.includes(indicator));
+  }
+
+  /**
+   * Start project flow for a user session
+   */
+  startProjectFlow(sessionId: string, existingInfo?: Partial<ProjectData>): ProjectFlowState {
+    const flowState: ProjectFlowState = {
       step: 'contact_info',
       isActive: true,
       lastQuestionTime: Date.now(),
@@ -74,7 +121,7 @@ class RFPService {
       } else if (!flowState.goals) {
         flowState.step = 'goals';
       } else {
-        flowState.step = 'proposal_format';
+        flowState.step = 'complete';
       }
     }
 
@@ -85,14 +132,14 @@ class RFPService {
   /**
    * Get current flow state for a session
    */
-  getFlowState(sessionId: string): RFPFlowState | null {
+  getFlowState(sessionId: string): ProjectFlowState | null {
     return this.flowStates.get(sessionId) || null;
   }
 
   /**
    * Check if user is being repetitive or unresponsive
    */
-  private isUserRepetitive(flowState: RFPFlowState, userMessage: string): boolean {
+  private isUserRepetitive(flowState: ProjectFlowState, userMessage: string): boolean {
     const messageLower = userMessage.toLowerCase();
     
     // Check if user is giving very brief responses
@@ -116,7 +163,7 @@ class RFPService {
   /**
    * Check if specific information has already been provided
    */
-  hasInformationBeenProvided(flowState: RFPFlowState, infoType: string): boolean {
+  hasInformationBeenProvided(flowState: ProjectFlowState, infoType: string): boolean {
     switch (infoType) {
       case 'timeline':
         return !!flowState.timeline && flowState.timeline !== 'Not provided';
@@ -136,9 +183,9 @@ class RFPService {
   }
 
   /**
-   * Check if RFP is essentially complete
+   * Check if project is essentially complete
    */
-  isRFPComplete(flowState: RFPFlowState): boolean {
+  isProjectComplete(flowState: ProjectFlowState): boolean {
     return this.hasInformationBeenProvided(flowState, 'contact') &&
            this.hasInformationBeenProvided(flowState, 'timeline') &&
            this.hasInformationBeenProvided(flowState, 'budget') &&
@@ -158,7 +205,7 @@ class RFPService {
   /**
    * Update flow state with contact information
    */
-  updateContactInfo(sessionId: string, contactInfo: ContactInfo): RFPFlowState | null {
+  updateContactInfo(sessionId: string, contactInfo: ContactInfo): ProjectFlowState | null {
     const flowState = this.flowStates.get(sessionId);
     if (!flowState || !flowState.isActive) return null;
 
@@ -173,7 +220,7 @@ class RFPService {
   /**
    * Update flow state with service type
    */
-  updateServiceType(sessionId: string, serviceType: string): RFPFlowState | null {
+  updateServiceType(sessionId: string, serviceType: string): ProjectFlowState | null {
     const flowState = this.flowStates.get(sessionId);
     if (!flowState || !flowState.isActive) return null;
 
@@ -188,7 +235,7 @@ class RFPService {
   /**
    * Update flow state with timeline
    */
-  updateTimeline(sessionId: string, timeline: string): RFPFlowState | null {
+  updateTimeline(sessionId: string, timeline: string): ProjectFlowState | null {
     const flowState = this.flowStates.get(sessionId);
     if (!flowState || !flowState.isActive) return null;
 
@@ -203,7 +250,7 @@ class RFPService {
   /**
    * Update flow state with budget
    */
-  updateBudget(sessionId: string, budget: string): RFPFlowState | null {
+  updateBudget(sessionId: string, budget: string): ProjectFlowState | null {
     const flowState = this.flowStates.get(sessionId);
     if (!flowState || !flowState.isActive) return null;
 
@@ -218,26 +265,11 @@ class RFPService {
   /**
    * Update flow state with goals
    */
-  updateGoals(sessionId: string, goals: string): RFPFlowState | null {
+  updateGoals(sessionId: string, goals: string): ProjectFlowState | null {
     const flowState = this.flowStates.get(sessionId);
     if (!flowState || !flowState.isActive) return null;
 
     flowState.goals = goals;
-    flowState.step = 'complete'; // Go directly to complete since we don't ask about document formatting
-    flowState.lastQuestionTime = Date.now();
-    flowState.questionRepeatCount = 0;
-    flowState.userResponses = [];
-    return flowState;
-  }
-
-  /**
-   * Update flow state with proposal format choice
-   */
-  updateProposalFormat(sessionId: string, format: string): RFPFlowState | null {
-    const flowState = this.flowStates.get(sessionId);
-    if (!flowState || !flowState.isActive) return null;
-
-    flowState.proposalFormat = format;
     flowState.step = 'complete';
     flowState.lastQuestionTime = Date.now();
     flowState.questionRepeatCount = 0;
@@ -276,30 +308,29 @@ class RFPService {
   }
 
   /**
-   * Complete RFP flow and get final data
+   * Complete project flow and get final data
    */
-  completeRFPFlow(sessionId: string): RFPData | null {
+  completeProjectFlow(sessionId: string): ProjectData | null {
     const flowState = this.flowStates.get(sessionId);
     if (!flowState || !flowState.isActive || !flowState.contactInfo) return null;
 
-    const rfpData: RFPData = {
+    const projectData: ProjectData = {
       contactInfo: flowState.contactInfo,
       serviceType: flowState.serviceType || '',
       timeline: flowState.timeline || '',
       budget: flowState.budget || '',
-      goals: flowState.goals || '',
-      proposalFormat: flowState.proposalFormat
+      goals: flowState.goals || ''
     };
 
     // Mark flow as inactive
     flowState.isActive = false;
-    return rfpData;
+    return projectData;
   }
 
   /**
-   * End RFP flow for a session
+   * End project flow for a session
    */
-  endRFPFlow(sessionId: string): void {
+  endProjectFlow(sessionId: string): void {
     this.flowStates.delete(sessionId);
   }
 
@@ -349,11 +380,11 @@ class RFPService {
   }
 
   /**
-   * Extract RFP information from conversation context
+   * Extract project information from conversation context
    */
-  extractExistingInfo(userMessage: string, userProfile?: any, conversationHistory?: string[]): Partial<RFPData> {
+  extractExistingInfo(userMessage: string, userProfile?: any, conversationHistory?: string[]): Partial<ProjectData> {
     const messageLower = userMessage.toLowerCase();
-    const existingInfo: Partial<RFPData> = {};
+    const existingInfo: Partial<ProjectData> = {};
 
     // Check for frustration indicators - don't extract info from frustrated messages
     const frustrationIndicators = [
@@ -487,9 +518,47 @@ class RFPService {
   }
 
   /**
-   * Generate smart RFP start message based on existing information
+   * Check if we should offer to take notes based on user's message
    */
-  generateSmartStartMessage(existingInfo: Partial<RFPData>, userProfile?: any): string {
+  shouldOfferToTakeNotes(userMessage: string): boolean {
+    const userHasStatedGoal = this.hasStatedGoal(userMessage);
+    const userHasMentionedProductOrService = this.hasMentionedProductOrService(userMessage);
+    const userSeemsCooperative = this.seemsCooperative(userMessage);
+    
+    return userHasStatedGoal && userHasMentionedProductOrService && userSeemsCooperative;
+  }
+
+  /**
+   * Generate casual note-taking offer message
+   */
+  generateNoteTakingOffer(userMessage: string): string {
+    const messageLower = userMessage.toLowerCase();
+    
+    // Different casual ways to offer note-taking
+    const offers = [
+      "Want me to jot that down so the team can take a look?",
+      "Want me to note your details for review?",
+      "I can pass this along and have someone follow up if that helps.",
+      "Should I make a note of this for the team?",
+      "Want me to save these details for when you're ready to move forward?"
+    ];
+    
+    // Choose based on context
+    if (messageLower.includes('website') || messageLower.includes('site')) {
+      return "Gotcha — want me to jot that down and pass it to the team?";
+    } else if (messageLower.includes('logo') || messageLower.includes('brand')) {
+      return "Sounds good — want me to note your details for review?";
+    } else if (messageLower.includes('marketing') || messageLower.includes('ads')) {
+      return "I can pass this along and have someone follow up if that helps.";
+    } else {
+      return offers[Math.floor(Math.random() * offers.length)];
+    }
+  }
+
+  /**
+   * Generate smart start message based on existing information
+   */
+  generateSmartStartMessage(existingInfo: Partial<ProjectData>, userProfile?: any): string {
     const hasName = userProfile?.name;
     const hasCompany = existingInfo.contactInfo?.company;
     const hasBudget = existingInfo.budget;
@@ -531,16 +600,16 @@ class RFPService {
       // We have both name and company, so skip asking for business name
       return `Thanks, ${hasName}! I've got ${hasCompany} as your business. What type of service or product are you requesting a proposal for?`;
     } else if (hasName) {
-      return `Thanks, ${hasName}! Let's start building your RFP. What's the name of your business?`;
+      return `Thanks, ${hasName}! Let's start building your project details. What's the name of your business?`;
     } else {
-      return "Great! Let's start building your RFP. What's the name of your business?";
+      return "Great! Let's start building your project details. What's the name of your business?";
     }
   }
 
   /**
    * Generate progress recap showing what's been collected so far
    */
-  generateProgressRecap(flowState: RFPFlowState): string {
+  generateProgressRecap(flowState: ProjectFlowState): string {
     const collected = [];
     
     if (flowState.contactInfo?.name && flowState.contactInfo.name !== 'Not provided') {
@@ -566,7 +635,7 @@ class RFPService {
     }
 
     if (collected.length === 0) {
-      return "Let's start building your RFP. What's the main goal for your project?";
+      return "Let's start building your project details. What's the main goal for your project?";
     }
 
     return `Great! I can help walk you through collecting your project details. So far I've got:
@@ -577,29 +646,29 @@ To keep things moving, what's the next detail we should capture?`;
   }
 
   /**
-   * Generate proposal summary from collected data
+   * Generate project summary from collected data
    */
-  generateProposalSummary(rfpData: RFPData): string {
+  generateProjectSummary(projectData: ProjectData): string {
     // Only show contact info if we have real data (not placeholders)
-    const hasRealContactInfo = rfpData.contactInfo.name !== 'Not provided' && 
-                              rfpData.contactInfo.email !== 'Not provided';
+    const hasRealContactInfo = projectData.contactInfo.name !== 'Not provided' && 
+                              projectData.contactInfo.email !== 'Not provided';
     
     const contactSection = hasRealContactInfo ? `
 **Contact Information:**
-• Name: ${rfpData.contactInfo.name}
-• Email: ${rfpData.contactInfo.email}
-• Phone: ${rfpData.contactInfo.phone}
-${rfpData.contactInfo.company ? `• Company: ${rfpData.contactInfo.company}` : ''}` : '';
+• Name: ${projectData.contactInfo.name}
+• Email: ${projectData.contactInfo.email}
+• Phone: ${projectData.contactInfo.phone}
+${projectData.contactInfo.company ? `• Company: ${projectData.contactInfo.company}` : ''}` : '';
 
     return `
 📋 **Project Summary**
 ${contactSection}
 
 **Project Details:**
-• Service Type: ${rfpData.serviceType}
-• Timeline: ${rfpData.timeline}
-• Budget: ${rfpData.budget}
-• Goals: ${rfpData.goals}
+• Service Type: ${projectData.serviceType}
+• Timeline: ${projectData.timeline}
+• Budget: ${projectData.budget}
+• Goals: ${projectData.goals}
 
 **Next Steps:**
 Perfect! I've captured all the key details for your project. Our team will use this information to prepare a comprehensive proposal that addresses your specific needs and timeline.
@@ -609,4 +678,4 @@ You can reach out to us at support@clubhausagency.com to continue the conversati
   }
 }
 
-export const rfpService = new RFPService(); 
+export const projectService = new ProjectService(); 

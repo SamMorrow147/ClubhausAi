@@ -231,7 +231,7 @@ export function ChatInterface() {
       console.log('🎨 Showing scribble animation!')
       setShowScribbleAnimation(true)
       // Mark this loading message to show animation even after completion
-      setMessagesWithAnimation(prev => new Set([...prev, loadingId]))
+      setMessagesWithAnimation(prev => new Set(Array.from(prev).concat([loadingId])))
     }
 
     // Handle first message animation without delays
