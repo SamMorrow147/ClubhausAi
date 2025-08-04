@@ -89,7 +89,7 @@ npm run dev
 
 ## 🧠 Chat Logging System
 
-The AI assistant now includes persistent chat logging using [Mem0 AI](https://docs.mem0.ai/). This allows you to:
+The AI assistant now includes persistent chat logging using a simple file-based system. This allows you to:
 
 - **Log all user messages** with metadata and timestamps
 - **Log all AI responses** for complete conversation tracking

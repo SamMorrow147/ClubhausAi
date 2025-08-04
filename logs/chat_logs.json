@@ -79,5 +79,18 @@
       "platform": "chat_ui",
       "type": "ai_response"
     }
+  },
+  {
+    "id": "test_1754264268470_fbqhxwfcg",
+    "userId": "test-user",
+    "sessionId": "test-session-123",
+    "role": "assistant",
+    "content": "This is a test AI response for debugging",
+    "timestamp": "2025-08-03T23:37:48.470Z",
+    "metadata": {
+      "test": true,
+      "platform": "chat_ui",
+      "type": "ai_response"
+    }
   }
 ]

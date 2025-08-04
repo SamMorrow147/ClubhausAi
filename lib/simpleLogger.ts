@@ -88,34 +88,41 @@ export class SimpleLogger {
     message: string,
     metadata: Record<string, any> = {}
   ): Promise<void> {
-    if (this.isVercel && this.databaseLogger) {
-      // Use database logger on Vercel
-      await this.databaseLogger.logUserMessage(userId, message, metadata)
-      return
-    }
-
-    // Use file system on local
-    const sessionId = metadata.sessionId || `session_${Date.now()}`
-    
-    const logEntry: ChatLog = {
-      id: `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      userId,
-      sessionId,
-      role: 'user',
-      content: message,
-      timestamp: new Date().toISOString(),
-      metadata: {
-        ...metadata,
-        platform: 'chat_ui',
-        type: 'user_input'
+    try {
+      if (this.isVercel && this.databaseLogger) {
+        // Use database logger on Vercel
+        await this.databaseLogger.logUserMessage(userId, message, metadata)
+        console.log('📝 Logged user message for user:', userId, '(Database)')
+        return
       }
+
+      // Use file system on local
+      const sessionId = metadata.sessionId || `session_${Date.now()}`
+      
+      const logEntry: ChatLog = {
+        id: `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        userId,
+        sessionId,
+        role: 'user',
+        content: message,
+        timestamp: new Date().toISOString(),
+        metadata: {
+          ...metadata,
+          platform: 'chat_ui',
+          type: 'user_input'
+        }
+      }
+
+      const logs = this.readLogs()
+      logs.push(logEntry)
+      this.writeLogs(logs)
+
+      console.log('📝 Logged user message for user:', userId, '(Local - file)')
+    } catch (error) {
+      console.error('❌ Failed to log user message:', error)
+      // Log the error but don't throw to avoid breaking the chat
+      console.error('❌ User message logging failed for userId:', userId, 'message length:', message.length)
     }
-
-    const logs = this.readLogs()
-    logs.push(logEntry)
-    this.writeLogs(logs)
-
-    console.log('📝 Logged user message for user:', userId, this.isVercel ? '(Database)' : '(Local - file)')
   }
 
   /**
@@ -126,34 +133,41 @@ export class SimpleLogger {
     response: string,
     metadata: Record<string, any> = {}
   ): Promise<void> {
-    if (this.isVercel && this.databaseLogger) {
-      // Use database logger on Vercel
-      await this.databaseLogger.logAIResponse(userId, response, metadata)
-      return
-    }
-
-    // Use file system on local
-    const sessionId = metadata.sessionId || `session_${Date.now()}`
-    
-    const logEntry: ChatLog = {
-      id: `ai_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      userId,
-      sessionId,
-      role: 'assistant',
-      content: response,
-      timestamp: new Date().toISOString(),
-      metadata: {
-        ...metadata,
-        platform: 'chat_ui',
-        type: 'ai_response'
+    try {
+      if (this.isVercel && this.databaseLogger) {
+        // Use database logger on Vercel
+        await this.databaseLogger.logAIResponse(userId, response, metadata)
+        console.log('🤖 Logged AI response for user:', userId, '(Database)')
+        return
       }
+
+      // Use file system on local
+      const sessionId = metadata.sessionId || `session_${Date.now()}`
+      
+      const logEntry: ChatLog = {
+        id: `ai_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        userId,
+        sessionId,
+        role: 'assistant',
+        content: response,
+        timestamp: new Date().toISOString(),
+        metadata: {
+          ...metadata,
+          platform: 'chat_ui',
+          type: 'ai_response'
+        }
+      }
+
+      const logs = this.readLogs()
+      logs.push(logEntry)
+      this.writeLogs(logs)
+
+      console.log('🤖 Logged AI response for user:', userId, '(Local - file)')
+    } catch (error) {
+      console.error('❌ Failed to log AI response:', error)
+      // Log the error but don't throw to avoid breaking the chat
+      console.error('❌ AI response logging failed for userId:', userId, 'response length:', response.length)
     }
-
-    const logs = this.readLogs()
-    logs.push(logEntry)
-    this.writeLogs(logs)
-
-    console.log('🤖 Logged AI response for user:', userId, this.isVercel ? '(Database)' : '(Local - file)')
   }
 
   /**

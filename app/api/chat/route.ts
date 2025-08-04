@@ -2,7 +2,7 @@ import { createGroq } from '@ai-sdk/groq'
 import fs from 'fs'
 import path from 'path'
 import { detectProjectType, getProjectQuestions } from '../../../lib/projectPatterns'
-import { findStrategicResponse, formatStrategicResponse } from '../../../lib/responses'
+import { findStrategicResponse, formatStrategicResponse, getConversationState } from '../../../lib/responses'
 import { createBreweryResponse, BreweryConversationState } from '../../../lib/breweryHandler'
 import { createMuralResponse, MuralConversationState } from '../../../lib/muralHandler'
 import { checkProjectTriggers } from '../../../lib/projectHandler'
@@ -39,7 +39,7 @@ function loadKnowledgeBase() {
 }
 
 // Simple text search function
-function searchKnowledge(query: string, knowledgeContent: string): string {
+function searchKnowledge(query: string, knowledgeContent: string, conversationContext?: string): string {
   const queryLower = query.toLowerCase()
   const sections = knowledgeContent.split(/(?=^##[^#])/gm)
   const relevantSections: string[] = []
@@ -50,6 +50,12 @@ function searchKnowledge(query: string, knowledgeContent: string): string {
   // Keywords that should boost relevance
   const queryWords = queryLower.split(/\s+/).filter(word => word.length > 2)
   const boostKeywords = ['hours', 'operating', 'schedule', 'time', 'open', 'close', 'access']
+  
+  // Keywords that indicate business/marketing context (should prioritize these)
+  const businessKeywords = ['marketing', 'advertising', 'campaign', 'budget', 'leads', 'sales', 'business', 'service', 'client', 'project', 'strategy', 'social media', 'facebook', 'ads', 'website', 'conversion']
+  
+  // Keywords that indicate case study context (should deprioritize these unless specifically asked)
+  const caseStudyKeywords = ['mural', 'locus', 'architecture', 'lake byllesby', 'brewery', 'omni', 'twisted pin', 'blasted ink', 'x games', 'skateboard']
   
   for (const section of sections) {
     const sectionLower = section.toLowerCase()
@@ -65,6 +71,26 @@ function searchKnowledge(query: string, knowledgeContent: string): string {
       score += contentMatches * 2 + headingMatches * 10 // Heading matches are much more important
     }
     
+    // Boost score for business/marketing keywords
+    for (const keyword of businessKeywords) {
+      if (queryLower.includes(keyword) && sectionLower.includes(keyword)) {
+        score += 100 // High boost for business context
+      }
+    }
+    
+    // Deprioritize case study content unless specifically asked
+    const hasCaseStudyKeywords = caseStudyKeywords.some(keyword => 
+      queryLower.includes(keyword) || sectionLower.includes(keyword)
+    )
+    const isCaseStudySection = caseStudyKeywords.some(keyword => 
+      sectionLower.includes(keyword)
+    )
+    
+    // If this is a case study section but user didn't ask for examples, reduce score
+    if (isCaseStudySection && !hasCaseStudyKeywords) {
+      score = score * 0.1 // Severely reduce score for case studies unless specifically requested
+    }
+    
     // Boost score for relevant keywords
     for (const keyword of boostKeywords) {
       if (queryLower.includes(keyword) && sectionLower.includes(keyword)) {
@@ -76,6 +102,14 @@ function searchKnowledge(query: string, knowledgeContent: string): string {
     if (queryLower.includes('hour') || queryLower.includes('operating') || queryLower.includes('schedule')) {
       if (sectionLower.includes('hour') || sectionLower.includes('operating') || sectionLower.includes('schedule')) {
         score += 100 // Maximum boost for operating hours queries
+      }
+    }
+    
+    // If conversation context indicates business discussion, prioritize business sections
+    if (conversationContext && conversationContext.toLowerCase().includes('business')) {
+      const isBusinessSection = businessKeywords.some(keyword => sectionLower.includes(keyword))
+      if (isBusinessSection) {
+        score += 200 // Very high boost for business sections in business context
       }
     }
     
@@ -210,6 +244,8 @@ export async function POST(req: Request) {
       requestId
     }).catch(logError => {
       console.error('❌ Failed to log user message (non-blocking):', logError)
+      // Log additional debug info
+      console.error('❌ User message logging failed - userId:', userId, 'sessionId:', sessionId, 'message length:', lastMessage.content.length)
     })
 
     // Get user profile status for context (only needed for contact capture and guidance)
@@ -234,15 +270,33 @@ export async function POST(req: Request) {
       console.log('⚡ Skipping user profile checks for fast first message')
     }
 
-    // Contact capture on 3rd bot message - highest priority
-    if (isThirdBotMessage) {
-      console.log('🎯 3rd bot message detected - triggering contact capture')
+    // Contact capture on 5th bot message (moved from 3rd to allow more value delivery first)
+    const isFifthBotMessage = botMessageCount === 4 // This will be the 5th bot message
+    if (isFifthBotMessage) {
+      console.log('🎯 5th bot message detected - triggering contact capture')
       
       // Check if we already have contact info to avoid being pushy
       const hasContact = userProfile && (userProfile.email || userProfile.phone)
       
-      if (!hasContact) {
-        const contactCaptureMessage = "Before we dive deeper, let me get your name and contact info so I can have one of our strategists follow up with some ideas specifically for your project. What's your name?"
+      // Check if we've already asked for contact info in this session
+      const sessionLogs = await logger.getLogsBySession(sessionId)
+      const hasAskedForContact = sessionLogs.some(log => 
+        log.metadata?.isContactCapture || 
+        log.content?.toLowerCase().includes('name and contact info') ||
+        log.content?.toLowerCase().includes('what\'s your name')
+      )
+      
+      // Only ask for contact if we've provided value first and they seem engaged
+      const userHasAskedQuestions = sessionLogs.some(log => 
+        log.role === 'user' && log.content?.includes('?')
+      )
+      
+      // Check if user has provided significant context (avoid asking for name if they've shared meaningful business info)
+      const conversationState = getConversationState(sessionId)
+      const hasSignificantIntent = conversationState?.providedContext?.hasSignificantIntent
+      
+      if (!hasContact && !hasAskedForContact && userHasAskedQuestions && !hasSignificantIntent) {
+        const contactCaptureMessage = "I'd love to have one of our strategists follow up with some specific ideas for your project. What's your name?"
         
         // No delay - instant response
         
@@ -255,13 +309,15 @@ export async function POST(req: Request) {
           isContactCapture: true
         }).catch(logError => {
           console.error('❌ Failed to log contact capture message (non-blocking):', logError)
+          // Log additional debug info
+          console.error('❌ Contact capture logging failed - userId:', userId, 'sessionId:', sessionId, 'response length:', contactCaptureMessage.length)
         })
 
         return new Response(
           JSON.stringify({ 
             message: contactCaptureMessage,
-            context: 'Contact capture on 3rd message',
-            debug: { requestId, responseType: 'CONTACT_CAPTURE', responseTime: Date.now() - startTime, messageNumber: 3 }
+            context: 'Contact capture on 5th message',
+            debug: { requestId, responseType: 'CONTACT_CAPTURE', responseTime: Date.now() - startTime, messageNumber: 5 }
           }),
           { 
             status: 200, 
@@ -269,13 +325,21 @@ export async function POST(req: Request) {
           }
         )
       } else {
-        console.log('👤 User already has contact info, skipping contact capture')
+        console.log('👤 User already has contact info, we\'ve already asked, or user hasn\'t engaged enough yet, skipping contact capture')
       }
     }
 
     // RFP pivot on 7th bot message - offer to build proper RFP
     if (isSeventhMessage) {
       console.log('🎯 7th bot message detected - triggering RFP pivot')
+      
+      // Check if we've already offered RFP in this session
+      const sessionLogs = await logger.getLogsBySession(sessionId)
+      const hasOfferedRFP = sessionLogs.some(log => 
+        log.metadata?.isRFPPivot || 
+        log.content?.toLowerCase().includes('request for proposal') ||
+        log.content?.toLowerCase().includes('rfp')
+      )
       
       // Check if user has given a basic project description (not already in RFP flow)
       const currentRFPFlow = rfpService.getFlowState(sessionId)
@@ -286,8 +350,18 @@ export async function POST(req: Request) {
         !lastMessage.content.toLowerCase().includes('thanks') &&
         !lastMessage.content.toLowerCase().includes('thank you')
       
-      if (hasBasicProjectDescription) {
-        const rfpPivotMessage = "Sounds like a great starting point! If you'd like, I can help you build a proper RFP (Request for Proposal) that outlines your goals, timeline, style preferences, and budget. That way, our team can hit the ground running with ideas tailored to your brand. Want to go through that together now?"
+      // Check if RFP is already complete (don't re-offer)
+      const isRFPComplete = currentRFPFlow && rfpService.isRFPComplete(currentRFPFlow)
+      
+      // Check if user is being casual (avoid RFP for casual users)
+      const isCasualUser = lastMessage.content.toLowerCase().includes('eh') ||
+                          lastMessage.content.toLowerCase().includes('just want') ||
+                          lastMessage.content.toLowerCase().includes('not really') ||
+                          lastMessage.content.toLowerCase().includes('not a big') ||
+                          lastMessage.content.toLowerCase().includes('haven\'t really')
+      
+      if (hasBasicProjectDescription && !hasOfferedRFP && !isCasualUser && !isRFPComplete) {
+        const rfpPivotMessage = "Sounds like a great starting point! If you'd like, I can help you walk through a quick RFP to get your goals, budget, and style preferences organized. That way, our team can hit the ground running with ideas tailored to your brand. Want to go through that together now?"
         
         // Log the RFP pivot response in background (non-blocking)
         logger.logAIResponse(userId, rfpPivotMessage, {
@@ -298,6 +372,8 @@ export async function POST(req: Request) {
           isRFPPivot: true
         }).catch(logError => {
           console.error('❌ Failed to log RFP pivot message (non-blocking):', logError)
+          // Log additional debug info
+          console.error('❌ RFP pivot logging failed - userId:', userId, 'sessionId:', sessionId, 'response length:', rfpPivotMessage.length)
         })
 
         return new Response(
@@ -312,23 +388,46 @@ export async function POST(req: Request) {
           }
         )
       } else {
-        console.log('📝 User response doesn\'t warrant RFP pivot, continuing normal flow')
+        console.log('📝 User response doesn\'t warrant RFP pivot or we\'ve already offered, continuing normal flow')
       }
     }
 
-    // Check for project triggers first
-    const projectTrigger = checkProjectTriggers(lastMessage.content)
-    if (projectTrigger) {
-      console.log('🎯 Found project trigger for:', projectTrigger.name)
+    // Check for strategic responses FIRST (more targeted than project triggers)
+    const strategicResponse = findStrategicResponse(lastMessage.content, sessionId)
+    if (strategicResponse) {
+      console.log('🎯 Found strategic response for:', strategicResponse.triggers?.[0] || 'unknown')
+      console.log('📝 Strategic response triggered, bypassing other checks')
       
-      // No delay - instant response
+      // Check if this is an RFP-related strategic response
+      if (strategicResponse.requiresContactInfo) {
+        console.log('📋 RFP flow initiated')
+        
+        // Extract existing information from the conversation
+        const existingInfo = rfpService.extractExistingInfo(lastMessage.content, userProfile)
+        
+        // Start RFP flow with existing information
+        rfpService.startRFPFlow(sessionId, existingInfo)
+        
+        const formattedResponse = formatStrategicResponse(strategicResponse, lastMessage.content, sessionId)
+        
+        return new Response(
+          JSON.stringify({
+            message: formattedResponse,
+            context: 'RFP flow initiated',
+            debug: { requestId, responseType: 'RFP_INITIATED', responseTime: Date.now() - startTime }
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
+      
+      // Regular strategic response
+      const formattedResponse = formatStrategicResponse(strategicResponse, lastMessage.content, sessionId)
       
       return new Response(
         JSON.stringify({ 
-          message: projectTrigger.response.text,
-          context: `Project trigger: ${projectTrigger.name}`,
-          projectTrigger: projectTrigger,
-          debug: { requestId, responseType: 'PROJECT_TRIGGER', responseTime: Date.now() - startTime }
+          message: formattedResponse,
+          context: 'Strategic response triggered',
+          debug: { requestId, responseType: 'STRATEGIC', responseTime: Date.now() - startTime }
         }),
         { 
           status: 200, 
@@ -337,11 +436,66 @@ export async function POST(req: Request) {
       )
     }
 
-    // Check for RFP flow first
+    // Check for project triggers second (after strategic responses)
+    const projectTrigger = checkProjectTriggers(lastMessage.content)
+    if (projectTrigger) {
+      console.log('🎯 Found project trigger for:', projectTrigger.name)
+      
+      // Skip AI identity trigger if conversation has started
+      if (projectTrigger.name === "AI Agent Introduction") {
+        console.log('🔄 Skipping AI identity trigger - conversation already started')
+      } else {
+        return new Response(
+          JSON.stringify({ 
+            message: projectTrigger.response.text,
+            context: `Project trigger: ${projectTrigger.name}`,
+            projectTrigger: projectTrigger,
+            debug: { requestId, responseType: 'PROJECT_TRIGGER', responseTime: Date.now() - startTime }
+          }),
+          { 
+            status: 200, 
+            headers: { 'Content-Type': 'application/json' } 
+          }
+        )
+      }
+    }
+
+    // Check for RFP flow
     const currentRFPFlow = rfpService.getFlowState(sessionId)
     
     if (currentRFPFlow && currentRFPFlow.isActive) {
       console.log('📋 RFP flow active, step:', currentRFPFlow.step)
+      
+      // Add user response to track repetitive behavior
+      rfpService.addUserResponse(sessionId, lastMessage.content)
+      
+      // Check if we should skip this step due to repetitive responses
+      if (rfpService.shouldSkipStep(sessionId)) {
+        console.log('⚠️ User being repetitive, skipping to next step')
+        // Force advance to next step
+        switch (currentRFPFlow.step) {
+          case 'contact_info':
+            rfpService.updateContactInfo(sessionId, { name: 'Not provided', email: 'not@provided.com', phone: '000-000-0000' })
+            break
+          case 'service_type':
+            rfpService.updateServiceType(sessionId, 'General services')
+            break
+          case 'timeline':
+            rfpService.updateTimeline(sessionId, 'Flexible timeline')
+            break
+          case 'budget':
+            rfpService.updateBudget(sessionId, 'Budget to be determined')
+            break
+          case 'goals':
+            rfpService.updateGoals(sessionId, 'General project goals')
+            break
+        }
+        // Get updated flow state
+        const updatedFlow = rfpService.getFlowState(sessionId)
+        if (updatedFlow) {
+          currentRFPFlow.step = updatedFlow.step
+        }
+      }
       
       // Handle different RFP flow steps
       switch (currentRFPFlow.step) {
@@ -371,6 +525,22 @@ export async function POST(req: Request) {
           
         case 'service_type':
           rfpService.updateServiceType(sessionId, lastMessage.content)
+          
+          // Check if timeline has already been provided
+          if (rfpService.hasInformationBeenProvided(currentRFPFlow, 'timeline')) {
+            // Skip to budget if timeline is already known
+            currentRFPFlow.step = 'budget'
+            rfpService.updateBudget(sessionId, lastMessage.content)
+            return new Response(
+              JSON.stringify({
+                message: "Thanks! Do you already have a budget range or cap in mind?",
+                context: 'RFP flow - service type collected, timeline already known',
+                debug: { requestId, responseType: 'RFP_SERVICE_COLLECTED_SKIP_TIMELINE', responseTime: Date.now() - startTime }
+              }),
+              { status: 200, headers: { 'Content-Type': 'application/json' } }
+            )
+          }
+          
           return new Response(
             JSON.stringify({
               message: "Got it. What's your ideal timeline or deadline for this project?",
@@ -382,6 +552,22 @@ export async function POST(req: Request) {
           
         case 'timeline':
           rfpService.updateTimeline(sessionId, lastMessage.content)
+          
+          // Check if budget has already been provided
+          if (rfpService.hasInformationBeenProvided(currentRFPFlow, 'budget')) {
+            // Skip to goals if budget is already known
+            currentRFPFlow.step = 'goals'
+            rfpService.updateGoals(sessionId, lastMessage.content)
+            return new Response(
+              JSON.stringify({
+                message: "Understood. What outcomes or goals are you hoping this project achieves? (e.g., increased sales, better UX, new product launch, rebranding)",
+                context: 'RFP flow - timeline collected, budget already known',
+                debug: { requestId, responseType: 'RFP_TIMELINE_COLLECTED_SKIP_BUDGET', responseTime: Date.now() - startTime }
+              }),
+              { status: 200, headers: { 'Content-Type': 'application/json' } }
+            )
+          }
+          
           return new Response(
             JSON.stringify({
               message: "Thanks! Do you already have a budget range or cap in mind?",
@@ -393,6 +579,27 @@ export async function POST(req: Request) {
           
         case 'budget':
           rfpService.updateBudget(sessionId, lastMessage.content)
+          
+          // Check if goals have already been provided
+          if (rfpService.hasInformationBeenProvided(currentRFPFlow, 'goals')) {
+            // Skip to proposal format if goals are already known
+            currentRFPFlow.step = 'proposal_format'
+            rfpService.updateProposalFormat(sessionId, lastMessage.content)
+            const rfpData = rfpService.completeRFPFlow(sessionId)
+            if (rfpData) {
+              const summary = rfpService.generateProposalSummary(rfpData)
+              return new Response(
+                JSON.stringify({
+                  message: summary,
+                  context: 'RFP flow - budget collected, goals already known',
+                  rfpData,
+                  debug: { requestId, responseType: 'RFP_BUDGET_COLLECTED_SKIP_GOALS', responseTime: Date.now() - startTime }
+                }),
+                { status: 200, headers: { 'Content-Type': 'application/json' } }
+              )
+            }
+          }
+          
           return new Response(
             JSON.stringify({
               message: "Understood. What outcomes or goals are you hoping this project achieves? (e.g., increased sales, better UX, new product launch, rebranding)",
@@ -443,8 +650,15 @@ export async function POST(req: Request) {
     if (isLikelyRFPPivotResponse) {
       if (isYesResponse) {
         console.log('✅ User agreed to RFP process')
-        rfpService.startRFPFlow(sessionId)
-        const rfpStartMessage = "Awesome. Let's start with a few quick questions to get the ball rolling. First up: What's the name of your business?"
+        
+        // Extract existing information from the conversation
+        const existingInfo = rfpService.extractExistingInfo(lastMessage.content, userProfile)
+        
+        // Start RFP flow with existing information
+        rfpService.startRFPFlow(sessionId, existingInfo)
+        
+        // Generate smart start message that acknowledges existing info
+        const rfpStartMessage = rfpService.generateSmartStartMessage(existingInfo, userProfile)
         
         return new Response(
           JSON.stringify({
@@ -469,148 +683,7 @@ export async function POST(req: Request) {
       }
     }
 
-    // Check for strategic responses first
-    const strategicResponse = findStrategicResponse(lastMessage.content)
-    if (strategicResponse) {
-      console.log('🎯 Found strategic response for:', strategicResponse.triggers[0])
-      console.log('📝 Strategic response triggered, bypassing RAG')
-      
-      // Check if this is an RFP pivot response (basic project description) - ONLY on 7th message
-      if (strategicResponse.nextStep === 'rfp_initiated' && isSeventhMessage) {
-        console.log('📋 RFP pivot response detected on 7th message')
-        const formattedResponse = formatStrategicResponse(strategicResponse)
-        
-        return new Response(
-          JSON.stringify({
-            message: formattedResponse,
-            context: 'RFP pivot response',
-            debug: { requestId, responseType: 'RFP_PIVOT_RESPONSE', responseTime: Date.now() - startTime }
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
-      }
-      
-      // Check if this is an RFP-related strategic response
-      if (strategicResponse.requiresContactInfo) {
-        console.log('📋 RFP flow initiated')
-        rfpService.startRFPFlow(sessionId)
-        const formattedResponse = formatStrategicResponse(strategicResponse)
-        
-        return new Response(
-          JSON.stringify({
-            message: formattedResponse,
-            context: 'RFP flow initiated',
-            debug: { requestId, responseType: 'RFP_INITIATED', responseTime: Date.now() - startTime }
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
-      }
-      
-      // Check if this is a brewery-related strategic response
-      const isBreweryResponse = strategicResponse.triggers.some(trigger => 
-        trigger.includes('brewery') || trigger.includes('beer') || trigger.includes('brewing')
-      )
-      
-      // Check if this is a mural-related strategic response
-      const isMuralResponse = strategicResponse.triggers.some(trigger => 
-        trigger.includes('mural') || trigger.includes('public art') || trigger.includes('installation') || trigger.includes('lake byllesby')
-      )
-      
-      if (isBreweryResponse) {
-        console.log('🍺 Brewery response detected, checking for follow-up details')
-        
-        // Initialize brewery conversation state if not exists
-        let breweryState: BreweryConversationState = {
-          hasMentionedOmni: true,
-          hasSharedMultiLocation: false,
-          hasSharedBrandPersonality: false,
-          hasSharedPhotography: false,
-          hasSharedMicroInteractions: false,
-          hasSharedLink: false,
-          conversationCount: 1
-        }
-        
-        // Check if we should share additional brewery details
-        const { response: breweryDetail, newState } = createBreweryResponse(lastMessage.content, breweryState)
-        
-        // Combine initial response with brewery detail if available
-        let finalResponse = formatStrategicResponse(strategicResponse)
-        if (breweryDetail && breweryDetail !== "What kind of brewery project are you thinking about?") {
-          finalResponse += `\n\n${breweryDetail}`
-        }
-        
-        // No delay - instant response
-        
-        return new Response(
-          JSON.stringify({ 
-            message: finalResponse,
-            context: 'Brewery strategic response with details',
-            breweryState: newState,
-            debug: { requestId, responseType: 'STRATEGIC_BREWERY', responseTime: Date.now() - startTime }
-          }),
-          { 
-            status: 200, 
-            headers: { 'Content-Type': 'application/json' } 
-          }
-        )
-      } else if (isMuralResponse) {
-        console.log('🎨 Mural response detected, checking for follow-up details')
-        
-        // Initialize mural conversation state if not exists
-        let muralState: MuralConversationState = {
-          hasMentionedLakeByllesby: true,
-          hasSharedConcept: false,
-          hasSharedMaterials: false,
-          hasSharedExecution: false,
-          hasSharedCommunity: false,
-          hasSharedLink: false,
-          conversationCount: 1
-        }
-        
-        // Check if we should share additional mural details
-        const { response: muralDetail, newState } = createMuralResponse(lastMessage.content, muralState)
-        
-        // Combine initial response with mural detail if available
-        let finalResponse = formatStrategicResponse(strategicResponse)
-        if (muralDetail && muralDetail !== "What kind of mural or public art project are you thinking about?") {
-          finalResponse += `\n\n${muralDetail}`
-        }
-        
-        // No delay - instant response
-        
-        return new Response(
-          JSON.stringify({ 
-            message: finalResponse,
-            context: 'Mural strategic response with details',
-            muralState: newState,
-            debug: { requestId, responseType: 'STRATEGIC_MURAL', responseTime: Date.now() - startTime }
-          }),
-          { 
-            status: 200, 
-            headers: { 'Content-Type': 'application/json' } 
-          }
-        )
-      } else {
-        // Regular strategic response
-        const formattedResponse = formatStrategicResponse(strategicResponse)
-        
-        // No delay - instant response
-        
-        return new Response(
-          JSON.stringify({ 
-            message: formattedResponse,
-            context: 'Strategic response triggered',
-            debug: { requestId, responseType: 'STRATEGIC', responseTime: Date.now() - startTime }
-          }),
-          { 
-            status: 200, 
-            headers: { 'Content-Type': 'application/json' } 
-          }
-        )
-      }
-    } else {
-      console.log('📝 No strategic response found, proceeding with RAG')
-    }
+    // Strategic responses are now checked at the top of the function
 
     // Detect project type from user message
     const detectedProjectType = detectProjectType(lastMessage.content)
@@ -620,7 +693,10 @@ export async function POST(req: Request) {
 
     // Load knowledge base and search for relevant content
     const knowledgeContent = loadKnowledgeBase()
-    const relevantContext = searchKnowledge(lastMessage.content, knowledgeContent)
+    
+    // Create conversation context from recent messages
+    const recentMessages = messages.slice(-4).map(msg => msg.content).join(' ')
+    const relevantContext = searchKnowledge(lastMessage.content, knowledgeContent, recentMessages)
 
     console.log('📚 Found relevant context length:', relevantContext.length)
 
@@ -703,26 +779,34 @@ Guidelines:
 🧠 Core Tone:
 - Only say "Welcome to the club" on the first message in a new conversation. Don't repeat it after that — it gets awkward.
 - After saying "Welcome to the club", if the user responds with "thanks" or similar, simply ask "What are you working on?" or "How can I help you today?"
-- Speak naturally, like a helpful creative strategist
+- Speak naturally, like a helpful assistant — be HELPFUL, not a gatekeeper
+- Your role is lead collector and conversation facilitator only — not strategist or designer
 - Be short, smart, and human — not robotic or overly polished
-- Keep responses concise and focused - avoid being verbose
-- Let the user do most of the talking - don't guess or answer for them
-- Ask simple, direct questions rather than making assumptions
-- When users are vague or say "I'm not sure", ask for contact info instead of more questions
-- Show curiosity about the user's business before offering solutions
-- Speak in a curious, helpful tone — especially when users are sharing info about their own projects
-- Ask thoughtful follow-up questions when users mention they need help (e.g. with logos, websites, SEO)
-- Keep replies concise and natural — focused more on conversation than promoting services unless prompted
+- PRIORITIZE BEING HELPFUL: Answer questions directly when you have the information
+- Provide specific, useful answers before asking for contact information
+- When users ask about support, timeline, or tools — give them clear, direct answers immediately
+- Show curiosity about the user's business and provide value in every response
+- Ask ONE simple follow-up question when needed — avoid stacked questions
 - Use casual first-person phrasing like "I can help with that," "Happy to explain," etc.
 - Avoid forced or gimmicky phrases like "you're part of the club" or similar themed taglines
 - Use natural, conversational intros like "Hey there — how can I help?" or "What are you working on?"
-- Establish value and understand needs before asking for contact information
+- Establish value and understand needs FIRST, then consider contact information
 - Stay relevant to what the user is actually asking about - don't bring up unrelated topics
 - If user is brief/vague after 2-3 exchanges, STOP asking questions and offer to connect with a human strategist
-- Focus on collecting information, not making suggestions or recommendations
 - When users give brief responses like "thanks" or "ok", acknowledge briefly and ask what they're working on
 - Don't be overly casual or dismissive - maintain professional helpfulness
 - NEVER say dismissive phrases like "Not much yet" or "Not really" - always be helpful and engaged
+- ANSWER QUESTIONS DIRECTLY: Don't dodge reasonable pre-sale questions like "Do you offer support?" or "What's your timeline?"
+- MATCH THE USER'S TONE: If they're casual ("Hey, do you do marketing stuff?"), be casual back. If they're formal, be professional.
+- AVOID FORMAL PITCHES FOR CASUAL USERS: Don't offer RFPs to users who say "Eh, haven't really set a budget" - offer quick wins instead.
+- NO DESIGN DIRECTION: Never suggest colors, fonts, or visual styles - focus on process, goals, and scope instead
+- KEEP RESPONSES CONCISE: Avoid philosophical or flowery descriptions
+- ASK ONE QUESTION AT A TIME: Don't overwhelm with multiple questions
+- RESPECT JOKES AND SARCASM: If user makes a sarcastic comment, acknowledge it briefly and redirect
+- NO ASSUMPTIONS: Don't suggest creative direction or strategy based on loose interpretation
+- NEVER ASK "What's your brand story?" - This question is banned. Use timeline, goals, or audience questions instead
+- FOLLOW PROPER QUESTION ORDER: Name → Email → Business Name → What you offer → Timeline → Budget
+- NEVER ask timeline first - collect name and email before timeline
 
 🚫 CRITICAL: NEVER mention HubSpot, any CRM platforms, or third-party certifications. If asked about accreditations, ONLY mention:
 - Silver Award for Best Web Design, Minnesota's Best Award
@@ -730,31 +814,32 @@ Guidelines:
 - Team member accreditations from Minneapolis College (MCTC) and BFA degrees
 
 🎯 Strategic Response Guidelines:
-1. **Prioritize flagship projects** - After high-impact work like X Games, lead with other flagship projects (Twisted Pin, Blasted Ink, Experience Maple Grove)
-2. **Connect cultural threads** - ONLY if someone explicitly mentions skateboards AND tattoos together, then lean into that crossover: "Skateboards and tattoos go hand-in-hand"
-3. **Portfolio-first approach** - Always offer specific project links over generic responses
-4. **Confident, not cautious** - Don't say "tattoos are a big commitment" - say "tattoos and skateboard design go hand-in-hand" ONLY when both are mentioned
+1. **NEVER reference clients unprompted** - Only mention client names or case studies if the user brings them up first
+2. **Accurate client information only** - If referencing clients, use ONLY the exact information from the knowledge base
+3. **No client guessing** - Never assume or guess the nature of a client's business
+4. **No client comparisons** - Never say "We've worked on similar projects before, like [Client Name]"
+4. **Portfolio-first approach** - Always offer specific project links over generic responses
 5. **Lead with confidence** - "Definitely. After [previous project], some of our other favorites include..."
-6. **Stay relevant** - Don't mention skateboards or tattoos unless the user brings them up first
+6. **Stay relevant** - Don't mention specific clients unless the user brings them up first
 7. **Accurate client categorization** - NEVER misclassify clients. Experience Maple Grove is a DMO (Destination Marketing Organization), not a park. Always use the exact client type from the knowledge base.
 
 🎯 Behavioral Rules:
-1. NEVER say you'll do something you can't actually do.
+1. BE HELPFUL FIRST: Answer questions directly when you have the information in the knowledge base.
+   - ✅ For questions about support, timeline, tools, or process — give specific answers immediately
+   - ✅ Use the FAQ information to provide helpful, detailed responses
+   - ❌ Don't dodge basic questions or give vague responses
+
+2. NEVER say you'll do something you can't actually do.
    - ❌ Don't say "I'll send a link" or "Let me check"
    - ✅ Instead say: "A Clubhaus team member will follow up to help with that."
 
-2. NEVER say "I don't have that info" if it's available in the knowledge base.
+3. NEVER say "I don't have that info" if it's available in the knowledge base.
    - Use the knowledge base context to provide accurate information
    - Only say you don't have info if it's truly not available
 
-3. NEVER make suggestions or recommendations about what the user should do.
-   - ❌ Don't suggest platforms, tools, or solutions
-   - ❌ Don't recommend specific approaches or technologies
-   - ✅ Focus on collecting information about their circumstances and needs
-   - ✅ Ask questions to understand their situation, don't propose solutions
-
-4. Only talk about Clubhaus services when asked or when clearly relevant.
-   - Focus more on asking the user about their goals and style.
+4. Focus on understanding their needs, but provide value in every response.
+   - ✅ Give helpful information along with questions
+   - ✅ Ask questions to understand their situation while being informative
 
 5. If a user mentions a logo or file:
    - Ask what file format it is
@@ -763,6 +848,38 @@ Guidelines:
 6. If the user asks for contact info:
    - Provide: support@clubhausagency.com
    - Do not make up personal emails or roles unless documented
+
+7. FALLBACK FOR UNANSWERED QUESTIONS:
+   - If you can't answer a specific question, acknowledge it and offer to connect with a human
+   - Example: "That's a great question about [topic]. A Clubhaus strategist would be happy to walk you through that in detail."
+
+8. POST-CONTACT COLLECTION FLOW:
+   - After collecting contact info, continue the conversation naturally
+   - Reference what they've shared about their project/company
+   - Offer next steps like RFP building or team connection
+   - Don't restart the conversation or repeat introductions
+
+9. NON-BUSINESS QUESTIONS:
+   - If user asks non-business questions (like "Why is the sky blue?"), acknowledge that you're a business-focused AI
+   - Say something like: "I'm focused on helping with business and marketing questions. Is there anything I can help you with regarding your brand, website, or marketing?"
+   - Don't try to answer general knowledge questions or jump to sales mode
+
+10. NO CREATIVE OUTPUT GENERATION:
+   - NEVER generate or suggest business names, taglines, logos, or brand directions
+   - NEVER offer unsolicited creative direction or strategy advice
+   - NEVER brainstorm creative ideas or suggest themes, aesthetic styles, or branding approaches
+   - NEVER editorialize or praise brand names (e.g., "That's beautiful" or "It evokes warmth")
+   - NEVER suggest color palettes, typography, or design elements
+- NEVER say "I'd love to explore the color palette and typography options with you"
+- NEVER ask "What do you envision for your brand?" - This leads to creative direction
+- NEVER suggest style options like "modern and sleek", "organic and earthy", "bold and playful"
+- NEVER offer aesthetic categories or brand directions
+   - If asked for creative output, respond: "That's something we usually explore collaboratively as part of a naming or brand identity project. Want to hear how that process works?"
+   - Focus on understanding goals, scope, and process - NOT creative solutions
+   - If asked for design ideas, defer to the creative team: "Our design team will explore that collaboratively during the discovery phase"
+   - Creative direction is handled by the team, not the bot
+   - Your role is to guide, qualify, and inform — not to create
+   - NEVER say "it's something we do often" — always say "Yes, that's something we can do"
 
 🌐 Website Help Protocol:
 When a user says they need help with a website, ask first:
@@ -774,9 +891,12 @@ Focus on understanding their needs and goals rather than technical implementatio
 Do NOT start by guessing the problem. This will steer you toward better discovery-style questioning and away from canned problem trees.
 
 🧾 Writing Style:
+- Be conversational and warm, not robotic or cold
 - Replies should be max 80 words unless detail is specifically requested
 - Never list more than 2 services in a single response
-- End responses with questions when appropriate
+- End responses with curious, engaging questions rather than generic ones
+- Show genuine interest in the user's project and needs
+- Use empathetic language: "Happy to walk you through..." instead of "Got it."
 - Avoid phrases like "I'm not sure" unless you clarify that you're an AI and a team member can follow up
 - Strategic responses for pricing/service questions take priority over general knowledge base responses${projectGuidance}${userInfoGuidance}
 
@@ -922,6 +1042,17 @@ Use this information to inform your responses, but speak like a sharp, curious c
       responseTime: Date.now() - startTime
     }).catch(memoryError => {
       console.error('❌ Failed to log AI response (non-blocking):', memoryError)
+      // Log additional debug info
+      console.error('❌ AI response logging failed - userId:', userId, 'sessionId:', sessionId, 'response length:', aiResponse.length, 'projectType:', detectedProjectType || 'general')
+      
+      // Fallback: Try to log to console as a last resort
+      console.log('🔄 FALLBACK LOGGING - AI Response:', {
+        userId,
+        sessionId,
+        content: aiResponse.substring(0, 100) + (aiResponse.length > 100 ? '...' : ''),
+        timestamp: new Date().toISOString(),
+        projectType: detectedProjectType || 'general'
+      })
     })
 
     // No delay - instant response

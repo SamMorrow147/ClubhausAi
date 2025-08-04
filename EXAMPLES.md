@@ -1,6 +1,6 @@
 # Chat Logging Examples
 
-This document shows how the Mem0 AI chat logging system works in practice.
+This document shows how the chat logging system works in practice.
 
 ## How It Works
 
@@ -9,7 +9,7 @@ When a user sends a message like "I need help with a logo design", the system:
 
 ```typescript
 // Automatically logs the user message
-await memoryService.logUserMessage(userId, "I need help with a logo design", {
+await logger.logUserMessage(userId, "I need help with a logo design", {
   sessionId: "session_1234567890",
   projectType: "logo_design"
 })
@@ -20,7 +20,7 @@ When the AI responds, it's also logged:
 
 ```typescript
 // Automatically logs the AI response
-await memoryService.logAIResponse(userId, "I'd love to help with your logo design! What's your brand about?", {
+await logger.logAIResponse(userId, "I'd love to help with your logo design! What's your brand about?", {
   sessionId: "session_1234567890",
   projectType: "logo_design"
 })

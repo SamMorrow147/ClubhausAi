@@ -283,7 +283,8 @@ export class UserProfileService {
         "What's the name of your business?",
         "What should I call your company?",
         "What's your business name?",
-        "What company are you with?"
+        "What company are you with?",
+        "Cool — what's your business called?"
       ],
       projectBudget: [
         "What's your budget for this project?",

@@ -4,17 +4,15 @@
       "name": "AI Agent Introduction",
       "tags": ["ai", "introduction", "capabilities", "assistant", "help", "support"],
       "trigger_phrases": [
-        "what do you do",
-        "what are you",
-        "who are you",
-        "what can you do",
-        "what are you good for",
-        "what is this",
-        "who am I talking to",
-        "are you a bot"
+        "are you a bot",
+        "are you ai",
+        "are you artificial intelligence", 
+        "what kind of bot are you",
+        "are you human",
+        "are you real"
       ],
       "response": {
-        "text": "I'm an AI agent developed by Clubhaus Agency to assist you. I can help you put together an RFP, connect you with someone from the team, or help you brainstorm and work through ideas. Where would you like to start?",
+        "text": "I'm the Clubhaus AI assistant. What can I help you with today?",
         "confidence_threshold": 0.7,
         "follow_up_questions": [
           "Are you looking to start an RFP?",

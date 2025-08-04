@@ -166,8 +166,14 @@ We're based in Uptown Minneapolis. We're more of a group of digital nomads — w
 
 ## ❓ Sample FAQs (for matching queries)
 
-### Do you offer support plans?
-Yes, we offer ongoing WordPress support including updates, backups, and monthly optimization.
+### Do you offer ongoing support?
+Yes, we offer ongoing support for updates, design tweaks, and new collateral after launch — either hourly or on retainer. Our support includes website maintenance, content updates, brand collateral adjustments, and strategic guidance as your business evolves.
+
+### What's your timeline?
+A typical logo + website project takes 6–10 weeks depending on complexity. We break it down into phases: discovery (1 week), design (2-3 weeks), development (2-4 weeks), and launch (1 week). Rush projects can be accommodated with adjusted timelines.
+
+### What tools do you use?
+Our team uses Figma for most web and UI work, and Adobe Creative Suite (Illustrator, Photoshop, InDesign) for branding and visual assets. For development, we work with React, Next.js, WordPress, and various AI integration tools.
 
 ### Can you build custom AI tools?
 Yes. We create chatbots, customer service tools, and internal dashboards using GPT, Groq, and vector search systems like the one you're using now.
@@ -181,4 +187,34 @@ Yes — that's our bread and butter. We often begin with branding, then build th
 ### Tattoo-related inquiries
 **Confident approach**: "Oh nice—tattoos and skateboard design go hand-in-hand. We actually did the branding for Blasted Ink, a tattoo shop inside Mall of America. Want to check it out?"
 **Portfolio focus**: Always route to Blasted Ink case study rather than generic artist recommendations
-**Cultural connection**: Emphasize the crossover between skate culture and tattoo culture 
+**Cultural connection**: Emphasize the crossover between skate culture and tattoo culture
+
+### Pricing and Rates
+**Hourly Rates:**
+- Standard hourly rate: $150 per hour for design and development work
+- Most small business websites: $2,500-$4,500 total depending on features
+- Rates may vary based on project complexity and scope
+
+**Logo Design Services:**
+- 2-3 initial concepts provided
+- 2 rounds of revisions included
+- Additional revisions available at hourly rate
+- Timeline: Typically 4-6 weeks
+- Usually works out to $1,500-$3,000 total
+
+**Small Business Packages:**
+- Bundled services starting at $2,500-$4,000
+- Includes logo, brand colors, typography, and basic brand guidelines
+- Custom packages available based on specific needs
+
+**Website Design:**
+- Small business websites: $2,500-$4,500 (5-15 pages, basic features)
+- Custom website builds: $8,000-$25,000+ depending on complexity
+- Includes design, development, and launch
+- Ongoing support and maintenance available
+
+**Payment Terms:**
+- 50% deposit required to begin work
+- Remaining balance due upon project completion
+- Hourly work billed monthly
+- All pricing includes project management and client communication 

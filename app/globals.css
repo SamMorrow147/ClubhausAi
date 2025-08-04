@@ -114,6 +114,38 @@
     -ms-user-select: text;
     user-select: text;
   }
+  
+  /* Allow text selection in chat messages */
+  .messages-list {
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+    user-select: text;
+  }
+  
+  .messages-list * {
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+    user-select: text;
+  }
+  
+  /* Allow text selection in message content */
+  .messages-list .max-w-xs,
+  .messages-list .max-w-2xl {
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+    user-select: text;
+  }
+  
+  .messages-list .max-w-xs *,
+  .messages-list .max-w-2xl * {
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+    user-select: text;
+  }
 }
 
 /* Glowing card styles */

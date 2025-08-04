@@ -111,6 +111,7 @@ export class DatabaseLogger {
       const redis = await this.getRedisClient()
       if (!redis) {
         console.log('⚠️ Redis not available, skipping log')
+        console.error('❌ Redis connection failed - KV_REST_API_URL:', !!process.env.KV_REST_API_URL, 'KV_REST_API_TOKEN:', !!process.env.KV_REST_API_TOKEN)
         return
       }
 
@@ -146,6 +147,7 @@ export class DatabaseLogger {
       console.log('🤖 Logged AI response for user:', userId, '(Database)')
     } catch (error) {
       console.error('❌ Failed to log AI response to database:', error)
+      console.error('❌ Database logging failed - userId:', userId, 'response length:', response.length, 'sessionId:', metadata.sessionId)
       // Don't throw - we don't want logging failures to break the chat
     }
   }
