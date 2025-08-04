@@ -552,7 +552,9 @@ export default function TestMemoryPage() {
                   {expandedSessions.has(session.sessionId) && (
                     <div className="border-t border-gray-600 bg-gray-750">
                       <div className="p-4 space-y-3">
-                        {session.logs.map((log) => (
+                        {session.logs
+                          .filter((log) => !log.content.includes('[PROFILE_UPDATE]'))
+                          .map((log) => (
                           <div key={log.id} className="flex space-x-3">
                             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
                               log.role === 'user' ? 'bg-blue-600' : 'bg-green-600'

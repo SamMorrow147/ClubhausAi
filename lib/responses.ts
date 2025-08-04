@@ -143,8 +143,8 @@ export const STRATEGIC_RESPONSES: StrategicResponse[] = [
       "need strategy",
       "looking for strategy"
     ],
-    response: "Sounds like a great starting point! If you'd like, I can help you walk through a quick RFP to get your goals, budget, and style preferences organized. That way, our team can hit the ground running with ideas tailored to your brand. Want to go through that together now?",
-    followUp: "Awesome. Let's start with a few quick questions to get the ball rolling. What's the name of your business?",
+    response: "Got it. If you want to get a formal proposal together later, just let me know.",
+    followUp: "What's your business name?",
     nextStep: "rfp_initiated"
   },
   // RFP/PROPOSAL ASSISTANCE FLOW
@@ -212,8 +212,8 @@ export const STRATEGIC_RESPONSES: StrategicResponse[] = [
       "looking for creative direction",
       "need consulting help"
     ],
-    response: "Got it. What's your ideal timeline or deadline for this project?",
-    nextStep: "timeline_established"
+    response: "Got it. What's your business name?",
+    nextStep: "business_name_collected"
   },
   {
     triggers: [
@@ -833,7 +833,7 @@ export const STRATEGIC_RESPONSES: StrategicResponse[] = [
       "delivery timeline",
       "typical timeline"
     ],
-    response: "A typical logo + website project takes 6–10 weeks depending on complexity. We break it down into phases: discovery, design, development, and launch.",
+    response: "Timeline depends on the scope and complexity of your project. We'll work with you to create a customized project plan that meets your needs and timeline.",
     followUp: "What's your ideal timeline for this project?"
   },
   {
@@ -914,8 +914,8 @@ export const STRATEGIC_RESPONSES: StrategicResponse[] = [
       "pricing difference",
       "cost comparison"
     ],
-    response: "Logo design typically starts around $2,500, while full website builds range from $8,000 to $25,000+ depending on complexity. We price based on scope and always provide detailed estimates upfront.",
-    followUp: "What's driving your need for design work right now?"
+    response: "We offer different packages to fit various project scopes and budgets. Our team will work with you to create a custom quote that fits your specific needs and goals.",
+    followUp: "What specific deliverables are you looking for - logo, website, brand guidelines, or a combination?"
   },
   // MARKETING CAMPAIGN SUCCESS MEASUREMENT
   {
@@ -1045,7 +1045,7 @@ export const STRATEGIC_RESPONSES: StrategicResponse[] = [
     response: "Perfect! That gives us everything we need to get started. With your budget and timeline in mind, we can definitely help optimize your ad performance and improve your website for lead generation. Would you prefer to start with updating your Facebook strategy or explore other platforms like Google Ads?",
     followUp: undefined
   },
-  // CASUAL BUSINESS QUESTIONS
+  // MARKETING FOR SMALL BUSINESSES
   {
     triggers: [
       "do you do marketing stuff",
@@ -1056,7 +1056,7 @@ export const STRATEGIC_RESPONSES: StrategicResponse[] = [
       "social media ads",
       "online advertising"
     ],
-    response: "We definitely do. Our team has experience helping small businesses grow their brand and online presence. What are you working on?",
+    response: "We definitely do. Our team has experience helping small businesses grow their brand and online presence. What's your business name?",
     followUp: undefined
   },
   // FACEBOOK ADS SPECIFIC
@@ -1200,7 +1200,7 @@ export const STRATEGIC_RESPONSES: StrategicResponse[] = [
       "small business package",
       "package pricing"
     ],
-    response: "Our hourly rate is $150/hour for design and development work. For most small business websites, that typically works out to $2,500-$4,500 total depending on features. Logo design includes 2-3 initial concepts with 2 rounds of revisions, and timeline is usually 4-6 weeks for most projects.",
+    response: "Our hourly rate is $150/hour for design and development work. We offer different packages to fit various project scopes and budgets. Our team will work with you to create a custom quote that fits your specific needs and goals. Logo design includes 2-3 initial concepts with 2 rounds of revisions. Timeline varies based on project scope and complexity.",
     followUp: "What specific deliverables are you looking for - logo, website, brand guidelines, or a combination?"
   },
   // ESCALATION FOR REPEATED REQUESTS
@@ -1228,7 +1228,7 @@ export const STRATEGIC_RESPONSES: StrategicResponse[] = [
       "cannot evaluate",
       "look elsewhere"
     ],
-    response: "You're absolutely right - I should have provided that information earlier. Thanks for your patience. Here's our pricing breakdown: $150/hour for design work, 2-3 initial concepts with 2 revision rounds included, and small business packages starting at $2,500. I apologize for not being more direct earlier. How can I help you move forward with your project?",
+    response: "You're absolutely right - I should have provided that information earlier. Thanks for your patience. We offer different packages to fit various project scopes and budgets. Our team will work with you to create a custom quote that fits your specific needs and goals. How can I help you move forward with your project?",
     followUp: "Would you like to discuss your specific project scope?"
   },
   // READY TO MOVE FORWARD
@@ -1339,6 +1339,28 @@ export const STRATEGIC_RESPONSES: StrategicResponse[] = [
         return "Are you looking for brand identity, website, or both?";
       }
     }
+  },
+  // CONVERSATION END RESPONSES
+  {
+    triggers: [
+      "I think I have what I need",
+      "I have what I need",
+      "that's all I need",
+      "I'm good",
+      "I'm done",
+      "that's it",
+      "thanks that's all",
+      "thank you that's all",
+      "I think I'm good",
+      "I think that's it",
+      "I think that's all",
+      "that should be it",
+      "that should be all",
+      "I think that should be it",
+      "I think that should be all"
+    ],
+    response: "Got it — your info's saved. We'll follow up soon. Appreciate you!",
+    followUp: undefined
   }
 ];
 

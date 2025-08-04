@@ -170,7 +170,7 @@ We're based in Uptown Minneapolis. We're more of a group of digital nomads — w
 Yes, we offer ongoing support for updates, design tweaks, and new collateral after launch — either hourly or on retainer. Our support includes website maintenance, content updates, brand collateral adjustments, and strategic guidance as your business evolves.
 
 ### What's your timeline?
-A typical logo + website project takes 6–10 weeks depending on complexity. We break it down into phases: discovery (1 week), design (2-3 weeks), development (2-4 weeks), and launch (1 week). Rush projects can be accommodated with adjusted timelines.
+Timeline depends on the scope and complexity of your project. We'll work with you to create a customized project plan that meets your needs and timeline.
 
 ### What tools do you use?
 Our team uses Figma for most web and UI work, and Adobe Creative Suite (Illustrator, Photoshop, InDesign) for branding and visual assets. For development, we work with React, Next.js, WordPress, and various AI integration tools.
@@ -192,24 +192,24 @@ Yes — that's our bread and butter. We often begin with branding, then build th
 ### Pricing and Rates
 **Hourly Rates:**
 - Standard hourly rate: $150 per hour for design and development work
-- Most small business websites: $2,500-$4,500 total depending on features
 - Rates may vary based on project complexity and scope
+- We work with you to create custom quotes that fit your specific needs and budget
 
 **Logo Design Services:**
 - 2-3 initial concepts provided
 - 2 rounds of revisions included
 - Additional revisions available at hourly rate
-- Timeline: Typically 4-6 weeks
-- Usually works out to $1,500-$3,000 total
+- Timeline varies based on project scope and complexity
+- Pricing varies based on project scope and complexity
 
 **Small Business Packages:**
-- Bundled services starting at $2,500-$4,000
+- Bundled services available with custom pricing
 - Includes logo, brand colors, typography, and basic brand guidelines
 - Custom packages available based on specific needs
 
 **Website Design:**
-- Small business websites: $2,500-$4,500 (5-15 pages, basic features)
-- Custom website builds: $8,000-$25,000+ depending on complexity
+- Small business websites with custom pricing based on features
+- Custom website builds with pricing based on complexity
 - Includes design, development, and launch
 - Ongoing support and maintenance available
 

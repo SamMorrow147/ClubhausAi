@@ -10,6 +10,7 @@ import SimpleLogger from '../../../lib/simpleLogger'
 import UserProfileService from '../../../lib/userProfileService'
 import TokenUsageService from '../../../lib/tokenUsageService'
 import { rfpService } from '../../../lib/rfpService'
+import { callGroqWithRetry, getRateLimitErrorMessage } from '../../../lib/groqRetry'
 
 // Create Groq provider instance
 const groq = createGroq({
@@ -136,8 +137,6 @@ function searchKnowledge(query: string, knowledgeContent: string, conversationCo
   console.log('📝 Returning', relevantSections.length, 'relevant sections')
   return result
 }
-
-import { callGroqWithRetry, getRateLimitErrorMessage } from '../../../lib/groqRetry'
 
 // Helper function to calculate response delay - DISABLED for instant responses
 function calculateResponseDelay(botMessageCount: number, elapsedTime: number): number {
@@ -361,7 +360,7 @@ export async function POST(req: Request) {
                           lastMessage.content.toLowerCase().includes('haven\'t really')
       
       if (hasBasicProjectDescription && !hasOfferedRFP && !isCasualUser && !isRFPComplete) {
-        const rfpPivotMessage = "Sounds like a great starting point! If you'd like, I can help you walk through a quick RFP to get your goals, budget, and style preferences organized. That way, our team can hit the ground running with ideas tailored to your brand. Want to go through that together now?"
+        const rfpPivotMessage = "Sounds good. If you want to get a formal proposal together later, just let me know."
         
         // Log the RFP pivot response in background (non-blocking)
         logger.logAIResponse(userId, rfpPivotMessage, {
@@ -403,7 +402,8 @@ export async function POST(req: Request) {
         console.log('📋 RFP flow initiated')
         
         // Extract existing information from the conversation
-        const existingInfo = rfpService.extractExistingInfo(lastMessage.content, userProfile)
+        const conversationHistory = messages.map(msg => msg.content);
+        const existingInfo = rfpService.extractExistingInfo(lastMessage.content, userProfile, conversationHistory)
         
         // Start RFP flow with existing information
         rfpService.startRFPFlow(sessionId, existingInfo)
@@ -611,31 +611,83 @@ export async function POST(req: Request) {
           
         case 'goals':
           rfpService.updateGoals(sessionId, lastMessage.content)
-          return new Response(
-            JSON.stringify({
-              message: "Thanks for all the details! Would you like me to help you format this into a proposal document or keep it conversational for now?",
-              context: 'RFP flow - goals collected',
-              debug: { requestId, responseType: 'RFP_GOALS_COLLECTED', responseTime: Date.now() - startTime }
-            }),
-            { status: 200, headers: { 'Content-Type': 'application/json' } }
-          )
           
-        case 'proposal_format':
-          rfpService.updateProposalFormat(sessionId, lastMessage.content)
-          const rfpData = rfpService.completeRFPFlow(sessionId)
-          if (rfpData) {
-            const summary = rfpService.generateProposalSummary(rfpData)
+          // Check if user is agreeing to format the proposal
+          const userMessageLower = lastMessage.content.toLowerCase();
+          const isAgreeingToFormat = userMessageLower.includes('yes') || 
+                                   userMessageLower.includes('yeah') || 
+                                   userMessageLower.includes('sure') || 
+                                   userMessageLower.includes('ok') || 
+                                   userMessageLower.includes('okay') ||
+                                   userMessageLower.includes('format') ||
+                                   userMessageLower.includes('proposal');
+          
+          if (isAgreeingToFormat) {
+            // User agreed to format, so complete the RFP
+            const rfpData = rfpService.completeRFPFlow(sessionId);
+            if (rfpData) {
+              const summary = rfpService.generateProposalSummary(rfpData);
+              return new Response(
+                JSON.stringify({
+                  message: summary,
+                  context: 'RFP flow - completed after agreement',
+                  rfpData,
+                  debug: { requestId, responseType: 'RFP_COMPLETED_AFTER_AGREEMENT', responseTime: Date.now() - startTime }
+                }),
+                { status: 200, headers: { 'Content-Type': 'application/json' } }
+              )
+            }
+          }
+          
+          // Check if we've already asked for format to prevent repetition
+          if (currentRFPFlow.hasAskedForFormat) {
+            // We've already asked, so complete the RFP
+            const rfpData = rfpService.completeRFPFlow(sessionId);
+            if (rfpData) {
+              const summary = rfpService.generateProposalSummary(rfpData);
+              return new Response(
+                JSON.stringify({
+                  message: summary,
+                  context: 'RFP flow - completed (already asked for format)',
+                  rfpData,
+                  debug: { requestId, responseType: 'RFP_COMPLETED_ALREADY_ASKED', responseTime: Date.now() - startTime }
+                }),
+                { status: 200, headers: { 'Content-Type': 'application/json' } }
+              )
+            }
+          }
+          
+          // Complete the RFP automatically since we're just collecting info, not creating documents
+          const completedRfpData = rfpService.completeRFPFlow(sessionId);
+          if (completedRfpData) {
+            const summary = rfpService.generateProposalSummary(completedRfpData);
             return new Response(
               JSON.stringify({
                 message: summary,
-                context: 'RFP flow - completed',
-                rfpData,
-                debug: { requestId, responseType: 'RFP_COMPLETED', responseTime: Date.now() - startTime }
+                context: 'RFP flow - completed automatically',
+                rfpData: completedRfpData,
+                debug: { requestId, responseType: 'RFP_COMPLETED_AUTO', responseTime: Date.now() - startTime }
               }),
               { status: 200, headers: { 'Content-Type': 'application/json' } }
             )
           }
-          break
+          
+                  case 'proposal_format':
+            // This case should no longer be reached since we complete automatically after goals
+            const fallbackRfpData = rfpService.completeRFPFlow(sessionId)
+            if (fallbackRfpData) {
+              const summary = rfpService.generateProposalSummary(fallbackRfpData)
+              return new Response(
+                JSON.stringify({
+                  message: summary,
+                  context: 'RFP flow - completed (fallback)',
+                  rfpData: fallbackRfpData,
+                  debug: { requestId, responseType: 'RFP_COMPLETED_FALLBACK', responseTime: Date.now() - startTime }
+                }),
+                { status: 200, headers: { 'Content-Type': 'application/json' } }
+              )
+            }
+            break
       }
     }
 
@@ -652,7 +704,8 @@ export async function POST(req: Request) {
         console.log('✅ User agreed to RFP process')
         
         // Extract existing information from the conversation
-        const existingInfo = rfpService.extractExistingInfo(lastMessage.content, userProfile)
+        const conversationHistory = messages.map(msg => msg.content);
+        const existingInfo = rfpService.extractExistingInfo(lastMessage.content, userProfile, conversationHistory)
         
         // Start RFP flow with existing information
         rfpService.startRFPFlow(sessionId, existingInfo)
@@ -670,7 +723,7 @@ export async function POST(req: Request) {
         )
       } else {
         console.log('❌ User declined RFP process')
-        const rfpDeclineMessage = "Thanks! If you ever want to turn this into a more formal brief or RFP, just say the word—I've got your back."
+        const rfpDeclineMessage = "Got it. If you want to get a formal proposal together later, just let me know."
         
         return new Response(
           JSON.stringify({
@@ -771,14 +824,128 @@ Guidelines:
 - DON'T repeat back phone numbers or email addresses - just acknowledge and move on
 - For phone numbers: "Thanks, [name]. Got it." then continue
 - For email: "Got it." then ask for phone number
-- If user provides invalid email-like text, politely ask for a valid email address`
-    }
+- If user provides invalid email-like text, politely ask for a valid email address
+- FOLLOW THIS ORDER: Name → Email → Phone → Business Name → What you offer → Timeline → Budget
+- NEVER ask "What's your brand story?" or "What's your main goal?" - these are banned questions
+- NEVER ask strategic questions like "What are you working on next?" or "Any tips for launching smoothly?" - you're a concierge, not a coach
+- NEVER give unsolicited advice or coaching - only answer direct questions
+- If user says they're done or have what they need, simply acknowledge and wrap up: "Got it — your info's saved. We'll follow up soon. Appreciate you!"
+- NEVER ask about timelines, deadlines, or project goals unless the user specifically asks about them
+- NEVER ask "What's your ideal timeline?" or "What's your deadline?" - these are coaching questions
+- NEVER ask "What are your goals?" or "What are you hoping to achieve?" - these are strategic questions
+- Focus on collecting: Name → Email → Phone → Business Name → What you offer
+- Only ask about timeline/budget if user specifically mentions them first
+- NEVER give specific pricing estimates like "$2,500" or "$10,000" (but hourly rate of $150/hour is okay)
+- NEVER say "usually works out to $X" or similar pricing estimates
+- NEVER provide specific pricing estimates to clients - only say pricing varies based on scope and complexity
+- NEVER give specific timeline estimates like "4-6 weeks" or "8-12 weeks"
+- NEVER say "A typical project takes X weeks" or similar timeline estimates
+- NEVER provide specific timeline estimates to clients - only say timeline varies based on scope and complexity
+- If asked about pricing, say: "We offer different packages to fit various project scopes and budgets. Our team will work with you to create a custom quote that fits your specific needs and goals."
+- If asked about timeline, say: "Timeline depends on the scope and complexity of your project. We'll work with you to create a customized project plan that meets your needs and timeline."
+
+🚫 CRITICAL: NEVER mention HubSpot, any CRM platforms, or third-party certifications. If asked about accreditations, ONLY mention:
+- Silver Award for Best Web Design, Minnesota's Best Award
+- Bronze Award for Best Creative Services, Minnesota's Best Award  
+- Team member accreditations from Minneapolis College (MCTC) and BFA degrees
+
+🎯 Strategic Response Guidelines:
+1. **NEVER reference clients unprompted** - Only mention client names or case studies if the user brings them up first
+2. **Accurate client information only** - If referencing clients, use ONLY the exact information from the knowledge base
+3. **No client guessing** - Never assume or guess the nature of a client's business
+4. **No client comparisons** - Never say "We've worked on similar projects before, like [Client Name]"
+4. **Portfolio-first approach** - Always offer specific project links over generic responses
+5. **Lead with confidence** - "Definitely. After [previous project], some of our other favorites include..."
+6. **Stay relevant** - Don't mention specific clients unless the user brings them up first
+7. **Accurate client categorization** - NEVER misclassify clients. Experience Maple Grove is a DMO (Destination Marketing Organization), not a park. Always use the exact client type from the knowledge base.
+
+🎯 Behavioral Rules:
+1. BE HELPFUL FIRST: Answer questions directly when you have the information in the knowledge base.
+   - ✅ For questions about support, timeline, tools, or process — give specific answers immediately
+   - ✅ Use the FAQ information to provide helpful, detailed responses
+   - ❌ Don't dodge basic questions or give vague responses
+
+2. NEVER say you'll do something you can't actually do.
+   - ❌ Don't say "I'll send a link" or "Let me check"
+   - ✅ Instead say: "A Clubhaus team member will follow up to help with that."
+
+3. NEVER say "I don't have that info" if it's available in the knowledge base.
+   - Use the knowledge base context to provide accurate information
+   - Only say you don't have info if it's truly not available
+
+4. Focus on understanding their needs, but provide value in every response.
+   - ✅ Give helpful information along with questions
+   - ✅ Ask questions to understand their situation while being informative
+
+5. If a user mentions a logo or file:
+   - Ask what file format it is
+   - Offer guidance or say: "One of our team members will reach out to collect it."
+
+6. If the user asks for contact info:
+   - Provide: support@clubhausagency.com
+   - Do not make up personal emails or roles unless documented
+
+7. FALLBACK FOR UNANSWERED QUESTIONS:
+   - If you can't answer a specific question, acknowledge it and offer to connect with a human
+   - Example: "That's a great question about [topic]. A Clubhaus strategist would be happy to walk you through that in detail."
+
+8. POST-CONTACT COLLECTION FLOW:
+   - After collecting contact info, continue the conversation naturally
+   - Reference what they've shared about their project/company
+   - Offer next steps like RFP building or team connection
+   - Don't restart the conversation or repeat introductions
+
+9. NON-BUSINESS QUESTIONS:
+   - If user asks non-business questions (like "Why is the sky blue?"), acknowledge that you're a business-focused AI
+   - Say something like: "I'm focused on helping with business and marketing questions. Is there anything I can help you with regarding your brand, website, or marketing?"
+   - Don't try to answer general knowledge questions or jump to sales mode
+
+10. NO CREATIVE OUTPUT GENERATION:
+   - NEVER generate or suggest business names, taglines, logos, or brand directions
+   - NEVER offer unsolicited creative direction or strategy advice
+   - NEVER brainstorm creative ideas or suggest themes, aesthetic styles, or branding approaches
+   - NEVER editorialize or praise brand names (e.g., "That's beautiful" or "It evokes warmth")
+   - NEVER suggest color palettes, typography, or design elements
+- NEVER say "I'd love to explore the color palette and typography options with you"
+- NEVER ask "What do you envision for your brand?" - This leads to creative direction
+- NEVER suggest style options like "modern and sleek", "organic and earthy", "bold and playful"
+- NEVER offer aesthetic categories or brand directions
+   - If asked for creative output, respond: "That's something we usually explore collaboratively as part of a naming or brand identity project. Want to hear how that process works?"
+   - Focus on understanding goals, scope, and process - NOT creative solutions
+   - If asked for design ideas, defer to the creative team: "Our design team will explore that collaboratively during the discovery phase"
+   - Creative direction is handled by the team, not the bot
+   - Your role is to guide, qualify, and inform — not to create
+   - NEVER say "it's something we do often" — always say "Yes, that's something we can do"
+
+🌐 Website Help Protocol:
+When a user says they need help with a website, ask first:
+- What's not working or what are you hoping to improve?
+- What's the main goal for the site?
+
+Focus on understanding their needs and goals rather than technical implementation details.
+
+Do NOT start by guessing the problem. This will steer you toward better discovery-style questioning and away from canned problem trees.
+
+🧾 Writing Style:
+- Be conversational and warm, not robotic or cold
+- Replies should be max 80 words unless detail is specifically requested
+- Never list more than 2 services in a single response
+- End responses with curious, engaging questions rather than generic ones
+- Show genuine interest in the user's project and needs
+- Use empathetic language: "Happy to walk you through..." instead of "Got it."
+- Avoid phrases like "I'm not sure" unless you clarify that you're an AI and a team member can follow up
+- Strategic responses for pricing/service questions take priority over general knowledge base responses${projectGuidance}${userInfoGuidance}
+
+KNOWLEDGE BASE CONTEXT:
+${relevantContext}
+
+Use this information to inform your responses, but speak like a sharp, curious creative strategist.`
 
     const systemPrompt = `You are the Clubhaus AI assistant. You represent a creative agency that values sharp thinking, curiosity, and clarity.
 
 🧠 Core Tone:
 - Only say "Welcome to the club" on the first message in a new conversation. Don't repeat it after that — it gets awkward.
-- After saying "Welcome to the club", if the user responds with "thanks" or similar, simply ask "What are you working on?" or "How can I help you today?"
+- After saying "Welcome to the club", if the user responds with "thanks" or similar, simply ask "What's your business name?" or "How can I help you today?"
 - Speak naturally, like a helpful assistant — be HELPFUL, not a gatekeeper
 - Your role is lead collector and conversation facilitator only — not strategist or designer
 - Be short, smart, and human — not robotic or overly polished
@@ -789,7 +956,7 @@ Guidelines:
 - Ask ONE simple follow-up question when needed — avoid stacked questions
 - Use casual first-person phrasing like "I can help with that," "Happy to explain," etc.
 - Avoid forced or gimmicky phrases like "you're part of the club" or similar themed taglines
-- Use natural, conversational intros like "Hey there — how can I help?" or "What are you working on?"
+- Use natural, conversational intros like "Hey there — how can I help?" or "What's your business name?"
 - Establish value and understand needs FIRST, then consider contact information
 - Stay relevant to what the user is actually asking about - don't bring up unrelated topics
 - If user is brief/vague after 2-3 exchanges, STOP asking questions and offer to connect with a human strategist
@@ -807,6 +974,17 @@ Guidelines:
 - NEVER ASK "What's your brand story?" - This question is banned. Use timeline, goals, or audience questions instead
 - FOLLOW PROPER QUESTION ORDER: Name → Email → Business Name → What you offer → Timeline → Budget
 - NEVER ask timeline first - collect name and email before timeline
+- NEVER ask strategic questions like "What are you working on next?" or "Any tips for launching smoothly?" - you're a concierge, not a coach
+- NEVER give unsolicited advice or coaching - only answer direct questions
+- If user says they're done or have what they need, simply acknowledge and wrap up: "Got it — your info's saved. We'll follow up soon. Appreciate you!"
+- NEVER ask about timelines, deadlines, or project goals unless the user specifically asks about them
+- NEVER ask "What's your ideal timeline?" or "What's your deadline?" - these are coaching questions
+- NEVER ask "What are your goals?" or "What are you hoping to achieve?" - these are strategic questions
+- Focus on collecting: Name → Email → Phone → Business Name → What you offer
+- Only ask about timeline/budget if user specifically mentions them first
+- NEVER dismiss or question business names - accept whatever name the user provides
+- NEVER say "that's not a business name" or similar dismissive language
+- Accept business names as provided, even if they seem unusual or brief
 
 🚫 CRITICAL: NEVER mention HubSpot, any CRM platforms, or third-party certifications. If asked about accreditations, ONLY mention:
 - Silver Award for Best Web Design, Minnesota's Best Award
@@ -1078,7 +1256,8 @@ Use this information to inform your responses, but speak like a sharp, curious c
         status: 200, 
         headers: { 'Content-Type': 'application/json' } 
       }
-    )
+    );
+  }
 
   } catch (error: any) {
     const totalTime = Date.now() - startTime
@@ -1184,4 +1363,4 @@ Use this information to inform your responses, but speak like a sharp, curious c
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     )
   }
-} 
+}

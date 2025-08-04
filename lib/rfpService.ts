@@ -17,6 +17,7 @@ export interface RFPFlowState {
   lastQuestionTime?: number;
   questionRepeatCount?: number;
   userResponses: string[];
+  hasAskedForFormat?: boolean; // Track if we've already asked about proposal format
 }
 
 export interface RFPData {
@@ -222,7 +223,7 @@ class RFPService {
     if (!flowState || !flowState.isActive) return null;
 
     flowState.goals = goals;
-    flowState.step = 'proposal_format';
+    flowState.step = 'complete'; // Go directly to complete since we don't ask about document formatting
     flowState.lastQuestionTime = Date.now();
     flowState.questionRepeatCount = 0;
     flowState.userResponses = [];
@@ -350,7 +351,7 @@ class RFPService {
   /**
    * Extract RFP information from conversation context
    */
-  extractExistingInfo(userMessage: string, userProfile?: any): Partial<RFPData> {
+  extractExistingInfo(userMessage: string, userProfile?: any, conversationHistory?: string[]): Partial<RFPData> {
     const messageLower = userMessage.toLowerCase();
     const existingInfo: Partial<RFPData> = {};
 
@@ -382,11 +383,68 @@ class RFPService {
       };
     }
 
-    // Extract business name from message
+    // Extract business name from message - enhanced to catch simple responses like "GG"
     const businessMatch = userMessage.match(/(?:business is called|company is|business name is|we are|i'm with|i work for|my company is)\s+([^.!?]+)/i);
     if (businessMatch) {
       if (!existingInfo.contactInfo) existingInfo.contactInfo = { name: 'Not provided', email: '', phone: '' };
       existingInfo.contactInfo.company = businessMatch[1].trim();
+    } else {
+      // Check if the entire message might be a business name (simple responses like "GG")
+      const trimmedMessage = userMessage.trim();
+      if (trimmedMessage.length > 0 && trimmedMessage.length < 50 && 
+          !trimmedMessage.includes(' ') && 
+          !trimmedMessage.includes('@') && 
+          !trimmedMessage.includes('http') &&
+          !trimmedMessage.toLowerCase().includes('yes') &&
+          !trimmedMessage.toLowerCase().includes('no') &&
+          !trimmedMessage.toLowerCase().includes('thanks') &&
+          !trimmedMessage.toLowerCase().includes('ok') &&
+          !trimmedMessage.toLowerCase().includes('sure')) {
+        
+        // This might be a business name
+        if (!existingInfo.contactInfo) existingInfo.contactInfo = { name: 'Not provided', email: '', phone: '' };
+        existingInfo.contactInfo.company = trimmedMessage;
+        console.log('🎯 Extracted potential business name:', trimmedMessage);
+      }
+    }
+    
+    // Also check conversation history for business names if provided
+    if (conversationHistory && conversationHistory.length > 0) {
+      for (const message of conversationHistory) {
+        const messageLower = message.toLowerCase();
+        
+        // Look for business name patterns in conversation history
+        const historyBusinessMatch = message.match(/(?:business is called|company is|business name is|we are|i'm with|i work for|my company is)\s+([^.!?]+)/i);
+        if (historyBusinessMatch && !existingInfo.contactInfo?.company) {
+          if (!existingInfo.contactInfo) existingInfo.contactInfo = { name: 'Not provided', email: '', phone: '' };
+          existingInfo.contactInfo.company = historyBusinessMatch[1].trim();
+          console.log('🎯 Extracted business name from conversation history:', historyBusinessMatch[1].trim());
+          break;
+        }
+        
+        // Look for simple business name responses in history (like "GG")
+        const trimmedHistoryMessage = message.trim();
+        if (trimmedHistoryMessage.length > 0 && trimmedHistoryMessage.length < 50 && 
+            !trimmedHistoryMessage.includes(' ') && 
+            !trimmedHistoryMessage.includes('@') && 
+            !trimmedHistoryMessage.includes('http') &&
+            !trimmedHistoryMessage.toLowerCase().includes('yes') &&
+            !trimmedHistoryMessage.toLowerCase().includes('no') &&
+            !trimmedHistoryMessage.toLowerCase().includes('thanks') &&
+            !trimmedHistoryMessage.toLowerCase().includes('ok') &&
+            !trimmedHistoryMessage.toLowerCase().includes('sure') &&
+            !trimmedHistoryMessage.toLowerCase().includes('hey') &&
+            !trimmedHistoryMessage.toLowerCase().includes('hi') &&
+            !trimmedHistoryMessage.toLowerCase().includes('hello') &&
+            !existingInfo.contactInfo?.company) {
+          
+          // This might be a business name from conversation history
+          if (!existingInfo.contactInfo) existingInfo.contactInfo = { name: 'Not provided', email: '', phone: '' };
+          existingInfo.contactInfo.company = trimmedHistoryMessage;
+          console.log('🎯 Extracted potential business name from conversation history:', trimmedHistoryMessage);
+          break;
+        }
+      }
     }
 
     // Extract budget information
@@ -438,32 +496,45 @@ class RFPService {
     const hasTimeline = existingInfo.timeline;
     const hasGoals = existingInfo.goals;
 
-    let message = "Awesome! ";
+    // If we have significant existing info, acknowledge it and ask for more
+    if (hasCompany || hasBudget || hasTimeline || hasGoals) {
+      let message = "Great! ";
 
-    // Acknowledge what we already know
+      // Acknowledge what we already know
+      if (hasName && hasCompany) {
+        message += `Thanks, ${hasName}. With ${hasCompany}'s `;
+      } else if (hasCompany) {
+        message += `With ${hasCompany}'s `;
+      } else if (hasName) {
+        message += `Thanks, ${hasName}. With your `;
+      } else {
+        message += "With your ";
+      }
+
+      // Reference their goals and budget
+      const parts = [];
+      if (hasGoals) parts.push(`goal of ${hasGoals.toLowerCase()}`);
+      if (hasBudget) parts.push(`${hasBudget} budget`);
+      if (hasTimeline) parts.push(`${hasTimeline} timeline`);
+
+      if (parts.length > 0) {
+        message += parts.join(' and ') + ", we've got a great framework to start from. ";
+      } else {
+        message += "project details, we can build a comprehensive proposal. ";
+      }
+
+      return message + "What else would you like to include in your project details?";
+    }
+
+    // If we don't have significant info, start with the first question
     if (hasName && hasCompany) {
-      message += `Thanks, ${hasName}. With ${hasCompany}'s `;
-    } else if (hasCompany) {
-      message += `With ${hasCompany}'s `;
+      // We have both name and company, so skip asking for business name
+      return `Thanks, ${hasName}! I've got ${hasCompany} as your business. What type of service or product are you requesting a proposal for?`;
     } else if (hasName) {
-      message += `Thanks, ${hasName}. With your `;
+      return `Thanks, ${hasName}! Let's start building your RFP. What's the name of your business?`;
     } else {
-      message += "With your ";
+      return "Great! Let's start building your RFP. What's the name of your business?";
     }
-
-    // Reference their goals and budget
-    const parts = [];
-    if (hasGoals) parts.push(`goal of ${hasGoals.toLowerCase()}`);
-    if (hasBudget) parts.push(`${hasBudget} budget`);
-    if (hasTimeline) parts.push(`${hasTimeline} timeline`);
-
-    if (parts.length > 0) {
-      message += parts.join(' and ') + ", we've got a great framework to start from. ";
-    } else {
-      message += "project details, we can build a comprehensive proposal. ";
-    }
-
-    return message + "What else would you like to include in your RFP?";
   }
 
   /**
@@ -498,7 +569,7 @@ class RFPService {
       return "Let's start building your RFP. What's the main goal for your project?";
     }
 
-    return `Great! I can help walk you through building out your RFP. So far I've got:
+    return `Great! I can help walk you through collecting your project details. So far I've got:
 
 ${collected.join('\n')}
 
@@ -521,7 +592,7 @@ To keep things moving, what's the next detail we should capture?`;
 ${rfpData.contactInfo.company ? `• Company: ${rfpData.contactInfo.company}` : ''}` : '';
 
     return `
-📋 **RFP Summary**
+📋 **Project Summary**
 ${contactSection}
 
 **Project Details:**
@@ -531,7 +602,7 @@ ${contactSection}
 • Goals: ${rfpData.goals}
 
 **Next Steps:**
-Perfect! I've captured all the key details for your RFP. Our team will use this information to prepare a comprehensive proposal that addresses your specific needs and timeline.
+Perfect! I've captured all the key details for your project. Our team will use this information to prepare a comprehensive proposal that addresses your specific needs and timeline.
 
 You can reach out to us at support@clubhausagency.com to continue the conversation, or is there anything else you'd like to add to your project requirements?
     `.trim();

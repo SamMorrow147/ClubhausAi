@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { MessageCircle, Send, Loader2, ExternalLink } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import { TypeAnimation } from 'react-type-animation'
+import { ScribbleAnimation } from './scribble-animation'
 
 interface Message {
   id: string
@@ -58,6 +59,11 @@ export function ChatInterface() {
   
   // State for transforming loading message
   const [loadingMessageId, setLoadingMessageId] = useState<string | null>(null)
+  
+  // State for scribble animation - show when bot is processing after valuable info gathered
+  const [showScribbleAnimation, setShowScribbleAnimation] = useState(false)
+  const [hasValuableInfo, setHasValuableInfo] = useState(false)
+  const [messagesWithAnimation, setMessagesWithAnimation] = useState<Set<string>>(new Set())
   
   // Reset animation states when starting fresh
   useEffect(() => {
@@ -126,6 +132,13 @@ export function ChatInterface() {
     }
   }, [isLoading])
 
+  // Hide scribble animation for loading state when loading stops, but keep it for completed messages
+  useEffect(() => {
+    if (!isLoading) {
+      setShowScribbleAnimation(false)
+    }
+  }, [isLoading])
+
   // Pointer tracking for glowing effect
   useEffect(() => {
     const card = cardRef.current
@@ -171,6 +184,26 @@ export function ChatInterface() {
     // Add user message INSTANTLY - no delays
     setMessages(prev => [...prev, userMessage])
 
+    // Check if this message contains valuable information
+    const hasName = /(?:my name is|i'm|i am|call me|this is)\s+([a-zA-Z]+(?:\s+[a-zA-Z]+)?)/i.test(messageText)
+    const hasEmail = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/.test(messageText)
+    const hasPhone = /(?:\+?1[-.\s]?)?\(?([0-9]{3})\)?[-.\s]?([0-9]{3})[-.\s]?([0-9]{4})/.test(messageText)
+    const hasBusinessInfo = /(?:business|company|startup|agency|studio|firm)/i.test(messageText)
+    
+    // Also check for simple name responses (just a name by itself)
+    const isSimpleName = /^[a-zA-Z]+(?:\s+[a-zA-Z]+){0,2}$/.test(messageText.trim()) && 
+                        messageText.trim().length > 1 && 
+                        messageText.trim().length < 30 &&
+                        !['yes', 'no', 'ok', 'sure', 'thanks', 'hello', 'hi', 'hey'].includes(messageText.toLowerCase().trim())
+    
+    console.log('🔍 Checking for valuable info:', { hasName, hasEmail, hasPhone, hasBusinessInfo, isSimpleName, messageText })
+    
+    // Update valuable info state
+    if (hasName || hasEmail || hasPhone || hasBusinessInfo || isSimpleName) {
+      console.log('✅ Found valuable info! Setting hasValuableInfo to true')
+      setHasValuableInfo(true)
+    }
+
     // Create loading message immediately after user message
     const loadingId = (Date.now() + 1).toString()
     const loadingMessage: Message = {
@@ -182,6 +215,24 @@ export function ChatInterface() {
     // Add loading message immediately - no delays for any message
     setMessages(prev => [...prev, loadingMessage])
     setLoadingMessageId(loadingId)
+    
+    // Show scribble animation if we have valuable info and this is not the first message
+    const hasValuableInfoInThisMessage = hasName || hasEmail || hasPhone || hasBusinessInfo || isSimpleName
+    const shouldShowAnimation = (hasValuableInfo || hasValuableInfoInThisMessage) && messages.length > 0
+    
+    console.log('🎨 Animation check:', { 
+      hasValuableInfo, 
+      hasValuableInfoInThisMessage,
+      messagesLength: messages.length, 
+      shouldShow: shouldShowAnimation 
+    })
+    
+    if (shouldShowAnimation) {
+      console.log('🎨 Showing scribble animation!')
+      setShowScribbleAnimation(true)
+      // Mark this loading message to show animation even after completion
+      setMessagesWithAnimation(prev => new Set([...prev, loadingId]))
+    }
 
     // Handle first message animation without delays
     if (messages.length === 0) {
@@ -492,7 +543,7 @@ export function ChatInterface() {
                     {messages.map((message, index) => (
                       <motion.div
                         key={message.id}
-                        className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                        className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} relative`}
                         initial={{ opacity: 0, y: 5 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{
@@ -525,6 +576,16 @@ export function ChatInterface() {
                             ease: "easeOut"
                           }}
                         >
+                          {/* Scribble animation positioned outside the bubble */}
+                          {((message.content === 'loading' && showScribbleAnimation) || 
+                            (message.role === 'assistant' && messagesWithAnimation.has(message.id))) && (
+                            <div className="absolute -right-2 top-1/4 transform -translate-y-1/2 opacity-70">
+                              <ScribbleAnimation 
+                                isVisible={message.content === 'loading' ? showScribbleAnimation : true} 
+                                className={`${isLightMode ? 'text-blue-900/60' : 'text-white/60'}`}
+                              />
+                            </div>
+                          )}
                           {message.content === 'loading' ? (
                             <div className={`inner-content ${
                               isLightMode 

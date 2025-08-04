@@ -1541,3 +1541,42 @@ body.light::before {
   color: white;
   text-decoration-thickness: 2px;
 }
+
+/* Scribble Animation Styles */
+.scribble-animation-container {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.8;
+  transition: opacity 0.3s ease;
+}
+
+.scribble-animation-container:hover {
+  opacity: 1;
+}
+
+.scribble-svg {
+  filter: drop-shadow(0 0 2px currentColor);
+  animation: scribble-pulse 2s ease-in-out infinite;
+}
+
+@keyframes scribble-pulse {
+  0%, 100% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+}
+
+/* Dark mode scribble animation */
+.scribble-svg {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* Light mode scribble animation */
+.light .scribble-svg {
+  color: rgba(59, 130, 246, 0.8);
+}
