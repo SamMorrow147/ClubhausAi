@@ -11,6 +11,7 @@ import UserProfileService from '../../../lib/userProfileService'
 import TokenUsageService from '../../../lib/tokenUsageService'
 import { projectService } from '../../../lib/rfpService'
 import { callGroqWithRetry, getRateLimitErrorMessage } from '../../../lib/groqRetry'
+import { getContextualPersonalityPhrase } from '../../../lib/personalityPhrases'
 
 // Create Groq provider instance
 const groq = createGroq({
@@ -144,6 +145,73 @@ function calculateResponseDelay(botMessageCount: number, elapsedTime: number): n
   return 0
 }
 
+// Helper function to detect conversation tone
+function detectConversationTone(userMessage: string, botMessageCount: number): 'casual' | 'formal' | 'serious' | 'fun' {
+  const messageLower = userMessage.toLowerCase();
+  
+  // Check for serious/formal indicators
+  const seriousKeywords = ['error', 'bug', 'problem', 'issue', 'complaint', 'refund', 'cancel', 'wrong', 'broken', 'doesn\'t work', 'not working', 'failed', 'disappointed', 'unhappy', 'urgent', 'emergency', 'critical'];
+  const hasSeriousContent = seriousKeywords.some(keyword => messageLower.includes(keyword));
+  
+  if (hasSeriousContent) {
+    return 'serious';
+  }
+  
+  // Check for formal indicators
+  const formalKeywords = ['sir', 'madam', 'please', 'kindly', 'would you', 'could you', 'thank you', 'appreciate', 'regards', 'best regards'];
+  const hasFormalContent = formalKeywords.some(keyword => messageLower.includes(keyword));
+  
+  if (hasFormalContent) {
+    return 'formal';
+  }
+  
+  // Check for fun indicators
+  const funKeywords = ['haha', 'lol', 'jk', 'just kidding', 'sarcasm', 'sarcastic', 'joking', 'not really', 'kidding', '😊', '😄', '😂', '😉', '😎', '🎉', '🎊', '🎯', '🔥', '💯', '✨'];
+  const hasFunContent = funKeywords.some(keyword => messageLower.includes(keyword));
+  
+  if (hasFunContent) {
+    return 'fun';
+  }
+  
+  // Default to casual
+  return 'casual';
+}
+
+// Helper function to determine response type
+function determineResponseType(botMessageCount: number, userMessage: string, isStrategicResponse: boolean): 'intro' | 'confirmation' | 'follow-up' | 'sign-off' | 'general' {
+  // First message in conversation
+  if (botMessageCount === 0) {
+    return 'intro';
+  }
+  
+  // Check for sign-off indicators
+  const signOffKeywords = ['thanks', 'thank you', 'that\'s all', 'i\'m good', 'i\'m done', 'that\'s it', 'got it', 'perfect', 'great', 'awesome', 'sounds good'];
+  const isSignOff = signOffKeywords.some(keyword => userMessage.toLowerCase().includes(keyword));
+  
+  if (isSignOff) {
+    return 'sign-off';
+  }
+  
+  // Check for confirmation indicators
+  const confirmationKeywords = ['yes', 'yeah', 'sure', 'okay', 'ok', 'definitely', 'absolutely', 'interested', 'like to', 'want to', 'sounds good', 'perfect'];
+  const isConfirmation = confirmationKeywords.some(keyword => userMessage.toLowerCase().includes(keyword));
+  
+  if (isConfirmation) {
+    return 'confirmation';
+  }
+  
+  // Check for follow-up indicators (asking questions)
+  const followUpKeywords = ['what', 'how', 'when', 'where', 'why', 'which', '?'];
+  const isFollowUp = followUpKeywords.some(keyword => userMessage.toLowerCase().includes(keyword));
+  
+  if (isFollowUp) {
+    return 'follow-up';
+  }
+  
+  // Default to general
+  return 'general';
+}
+
 export async function POST(req: Request) {
   const startTime = Date.now()
   const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
@@ -158,10 +226,6 @@ export async function POST(req: Request) {
       throw new Error('Request timeout after 25 seconds')
     }, 25000)
 
-    console.log(`🔍 Chat API called [${requestId}]`)
-    console.log('🔑 GROQ_API_KEY exists:', !!process.env.GROQ_API_KEY)
-    console.log('🔑 GROQ_API_KEY starts with:', process.env.GROQ_API_KEY?.substring(0, 10))
-    
     // Parse the request body
     const { messages, sessionId: providedSessionId } = await req.json()
 
@@ -214,9 +278,8 @@ export async function POST(req: Request) {
     // Extract user information from the message - but be more conservative about names
     const extractedInfo = userProfileService.extractUserInfoFromMessage(lastMessage.content)
     
-    // Update user profile in background (non-blocking)
+    // Additional validation for names - only accept if it's clearly a name
     if (Object.keys(extractedInfo).length > 0) {
-      // Additional validation for names - only accept if it's clearly a name
       if (extractedInfo.name) {
         const questionWords = ['what', 'why', 'how', 'when', 'where', 'who', 'which']
         const isQuestionWord = questionWords.includes(extractedInfo.name.toLowerCase())
@@ -229,10 +292,318 @@ export async function POST(req: Request) {
       
       if (Object.keys(extractedInfo).length > 0) {
         console.log('👤 Extracted user info:', extractedInfo)
-        // Run in background to avoid blocking response
-        userProfileService.updateUserProfile(userId, sessionId, extractedInfo).catch(error => {
-          console.error('❌ User profile update failed (non-blocking):', error)
+      }
+    }
+    
+    // CRITICAL: PRIORITY 1 - Check for meeting/help requests that require contact info collection FIRST
+    const meetingKeywords = ['meeting', 'meet', 'talk', 'call', 'schedule', 'appointment', 'consultation', 'help', 'need help', 'want to work', 'work with you', 'hire you', 'get started', 'begin', 'start project']
+    const hasMeetingIntent = meetingKeywords.some(keyword => 
+      lastMessage.content.toLowerCase().includes(keyword)
+    )
+    
+    // Check if user is expressing interest in working with us
+    const interestKeywords = ['yeah', 'yes', 'sure', 'okay', 'ok', 'definitely', 'absolutely', 'interested', 'like to', 'want to']
+    const hasInterest = interestKeywords.some(keyword => 
+      lastMessage.content.toLowerCase().includes(keyword)
+    )
+    
+    // Check if this is likely a response to a service question
+    const isLikelyServiceResponse = hasInterest && (
+      lastMessage.content.toLowerCase().includes('meeting') ||
+      lastMessage.content.toLowerCase().includes('help') ||
+      lastMessage.content.toLowerCase().includes('work') ||
+      lastMessage.content.toLowerCase().includes('you guys') ||
+      lastMessage.content.toLowerCase().includes('team')
+    )
+    
+    // PRIORITY 1: Contact collection when user expresses interest in working with us
+    if (hasMeetingIntent || isLikelyServiceResponse) {
+      console.log('🎯 Meeting/help request detected - checking contact info status')
+      
+      // Get current user profile to see what contact info we have
+      const currentUserProfile = await userProfileService.getUserProfile(userId, sessionId)
+      const userInfoStatus = await userProfileService.getUserInfoStatus(userId, sessionId)
+      
+      console.log('👤 Current contact info status:', userInfoStatus)
+      
+      // If we don't have complete contact info, collect it systematically
+      if (!userInfoStatus.isComplete) {
+        const missingInfo = []
+        if (!userInfoStatus.hasName) missingInfo.push('name')
+        if (!userInfoStatus.hasEmail) missingInfo.push('email')
+        if (!userInfoStatus.hasPhone) missingInfo.push('phone')
+        
+        console.log('📝 Missing contact info:', missingInfo)
+        
+        // Start with name if we don't have it
+        if (!userInfoStatus.hasName) {
+          const contactCaptureMessage = "Great! I'd love to help get that set up. What's your name?"
+          
+          // Log the contact capture response
+          logger.logAIResponse(userId, contactCaptureMessage, {
+            sessionId,
+            projectType: 'contact_capture',
+            requestId,
+            responseTime: Date.now() - startTime,
+            isContactCapture: true,
+            missingInfo: missingInfo
+          }).catch(logError => {
+            console.error('❌ Failed to log contact capture message:', logError)
+          })
+
+          return new Response(
+            JSON.stringify({ 
+              message: contactCaptureMessage,
+              context: 'Contact capture - asking for name',
+              debug: { requestId, responseType: 'CONTACT_CAPTURE_NAME', responseTime: Date.now() - startTime }
+            }),
+            { 
+              status: 200, 
+              headers: { 'Content-Type': 'application/json' } 
+            }
+          )
+        }
+        
+        // If we have name but missing email
+        if (userInfoStatus.hasName && !userInfoStatus.hasEmail) {
+          const contactCaptureMessage = "Thanks! What's your email address?"
+          
+          logger.logAIResponse(userId, contactCaptureMessage, {
+            sessionId,
+            projectType: 'contact_capture',
+            requestId,
+            responseTime: Date.now() - startTime,
+            isContactCapture: true,
+            missingInfo: missingInfo
+          }).catch(logError => {
+            console.error('❌ Failed to log contact capture message:', logError)
+          })
+
+          return new Response(
+            JSON.stringify({ 
+              message: contactCaptureMessage,
+              context: 'Contact capture - asking for email',
+              debug: { requestId, responseType: 'CONTACT_CAPTURE_EMAIL', responseTime: Date.now() - startTime }
+            }),
+            { 
+              status: 200, 
+              headers: { 'Content-Type': 'application/json' } 
+            }
+          )
+        }
+        
+        // If we have name and email but missing phone
+        if (userInfoStatus.hasName && userInfoStatus.hasEmail && !userInfoStatus.hasPhone) {
+          const contactCaptureMessage = "Perfect! And what's your phone number?"
+          
+          logger.logAIResponse(userId, contactCaptureMessage, {
+            sessionId,
+            projectType: 'contact_capture',
+            requestId,
+            responseTime: Date.now() - startTime,
+            isContactCapture: true,
+            missingInfo: missingInfo
+          }).catch(logError => {
+            console.error('❌ Failed to log contact capture message:', logError)
+          })
+
+          return new Response(
+            JSON.stringify({ 
+              message: contactCaptureMessage,
+              context: 'Contact capture - asking for phone',
+              debug: { requestId, responseType: 'CONTACT_CAPTURE_PHONE', responseTime: Date.now() - startTime }
+            }),
+            { 
+              status: 200, 
+              headers: { 'Content-Type': 'application/json' } 
+            }
+          )
+        }
+      }
+      
+      // If we have complete contact info, proceed with meeting setup
+      if (userInfoStatus.isComplete) {
+        const meetingSetupMessage = "Perfect! I'll pass this along and someone from our team will reach out to schedule a time that works for you."
+        
+        logger.logAIResponse(userId, meetingSetupMessage, {
+          sessionId,
+          projectType: 'meeting_setup',
+          requestId,
+          responseTime: Date.now() - startTime,
+          isMeetingSetup: true
+        }).catch(logError => {
+          console.error('❌ Failed to log meeting setup message:', logError)
         })
+
+        return new Response(
+          JSON.stringify({ 
+            message: meetingSetupMessage,
+            context: 'Meeting setup with complete contact info',
+            debug: { requestId, responseType: 'MEETING_SETUP', responseTime: Date.now() - startTime }
+          }),
+          { 
+            status: 200, 
+            headers: { 'Content-Type': 'application/json' } 
+          }
+        )
+      }
+    }
+    
+    // PRIORITY 2: Check if user just provided contact info and we need to continue the collection flow
+    const hasProvidedContactInfo = extractedInfo.name || extractedInfo.email || extractedInfo.phone
+    if (hasProvidedContactInfo) {
+      console.log('📝 User provided contact info:', extractedInfo)
+      
+      // Update user profile FIRST and wait for it to complete
+      await userProfileService.updateUserProfile(userId, sessionId, extractedInfo)
+      
+      // Get updated user profile after extraction
+      const updatedUserProfile = await userProfileService.getUserProfile(userId, sessionId)
+      const updatedUserInfoStatus = await userProfileService.getUserInfoStatus(userId, sessionId)
+      
+      console.log('👤 Updated contact info status:', updatedUserInfoStatus)
+      
+      // If user provided email, acknowledge it and ask for next missing piece
+      if (extractedInfo.email) {
+        console.log('📧 User provided email:', extractedInfo.email)
+        
+        // Check what's still missing
+        if (!updatedUserInfoStatus.hasPhone) {
+          const nextContactMessage = "Perfect! And what's your phone number?"
+          
+          logger.logAIResponse(userId, nextContactMessage, {
+            sessionId,
+            projectType: 'contact_capture',
+            requestId,
+            responseTime: Date.now() - startTime,
+            isContactCapture: true,
+            providedInfo: extractedInfo
+          }).catch(logError => {
+            console.error('❌ Failed to log contact capture message:', logError)
+          })
+
+          return new Response(
+            JSON.stringify({ 
+              message: nextContactMessage,
+              context: 'Contact capture - asking for phone after email',
+              debug: { requestId, responseType: 'CONTACT_CAPTURE_PHONE_FOLLOWUP', responseTime: Date.now() - startTime }
+            }),
+            { 
+              status: 200, 
+              headers: { 'Content-Type': 'application/json' } 
+            }
+          )
+        } else {
+          // All contact info collected
+          const completionMessage = "Perfect! I have all the information I need. I'll pass this along and someone from our team will reach out to schedule a time that works for you."
+          
+          logger.logAIResponse(userId, completionMessage, {
+            sessionId,
+            projectType: 'contact_capture_complete',
+            requestId,
+            responseTime: Date.now() - startTime,
+            isContactCaptureComplete: true,
+            providedInfo: extractedInfo
+          }).catch(logError => {
+            console.error('❌ Failed to log contact capture completion message:', logError)
+          })
+
+          return new Response(
+            JSON.stringify({ 
+              message: completionMessage,
+              context: 'Contact capture complete',
+              debug: { requestId, responseType: 'CONTACT_CAPTURE_COMPLETE', responseTime: Date.now() - startTime }
+            }),
+            { 
+              status: 200, 
+              headers: { 'Content-Type': 'application/json' } 
+            }
+          )
+        }
+      }
+      
+      // If user provided name, ask for email
+      if (extractedInfo.name && !updatedUserInfoStatus.hasEmail) {
+        const nextContactMessage = "Thanks! What's your email address?"
+        
+        logger.logAIResponse(userId, nextContactMessage, {
+          sessionId,
+          projectType: 'contact_capture',
+          requestId,
+          responseTime: Date.now() - startTime,
+          isContactCapture: true,
+          providedInfo: extractedInfo
+        }).catch(logError => {
+          console.error('❌ Failed to log contact capture message:', logError)
+        })
+
+        return new Response(
+          JSON.stringify({ 
+            message: nextContactMessage,
+            context: 'Contact capture - asking for email after name',
+            debug: { requestId, responseType: 'CONTACT_CAPTURE_EMAIL_FOLLOWUP', responseTime: Date.now() - startTime }
+          }),
+          { 
+            status: 200, 
+            headers: { 'Content-Type': 'application/json' } 
+          }
+        )
+      }
+      
+      // If user provided phone, ask for email
+      if (extractedInfo.phone && !updatedUserInfoStatus.hasEmail) {
+        const nextContactMessage = "Thanks! What's your email address?"
+        
+        logger.logAIResponse(userId, nextContactMessage, {
+          sessionId,
+          projectType: 'contact_capture',
+          requestId,
+          responseTime: Date.now() - startTime,
+          isContactCapture: true,
+          providedInfo: extractedInfo
+        }).catch(logError => {
+          console.error('❌ Failed to log contact capture message:', logError)
+        })
+
+        return new Response(
+          JSON.stringify({ 
+            message: nextContactMessage,
+            context: 'Contact capture - asking for email after phone',
+            debug: { requestId, responseType: 'CONTACT_CAPTURE_EMAIL_FOLLOWUP', responseTime: Date.now() - startTime }
+          }),
+          { 
+            status: 200, 
+            headers: { 'Content-Type': 'application/json' } 
+          }
+        )
+      }
+      
+      // If we now have complete contact info, proceed with meeting setup
+      if (updatedUserInfoStatus.isComplete) {
+        const meetingSetupMessage = "Perfect! I'll pass this along and someone from our team will reach out to schedule a time that works for you."
+        
+        logger.logAIResponse(userId, meetingSetupMessage, {
+          sessionId,
+          projectType: 'meeting_setup',
+          requestId,
+          responseTime: Date.now() - startTime,
+          isMeetingSetup: true,
+          contactInfoComplete: true
+        }).catch(logError => {
+          console.error('❌ Failed to log meeting setup message:', logError)
+        })
+
+        return new Response(
+          JSON.stringify({ 
+            message: meetingSetupMessage,
+            context: 'Meeting setup after contact info completion',
+            debug: { requestId, responseType: 'MEETING_SETUP_COMPLETE', responseTime: Date.now() - startTime }
+          }),
+          { 
+            status: 200, 
+            headers: { 'Content-Type': 'application/json' } 
+          }
+        )
       }
     }
     
@@ -269,7 +640,7 @@ export async function POST(req: Request) {
       console.log('⚡ Skipping user profile checks for fast first message')
     }
 
-    // Contact capture on 8th bot message (moved from 5th to allow much more natural conversation first)
+    // PRIORITY 3: Contact capture on 8th bot message (moved from 5th to allow much more natural conversation first)
     const isEighthBotMessage = botMessageCount === 7 // This will be the 8th bot message
     if (isEighthBotMessage) {
       console.log('🎯 8th bot message detected - considering contact capture')
@@ -695,8 +1066,6 @@ export async function POST(req: Request) {
       }
     }
 
-    // Strategic responses are now checked at the top of the function
-
     // Detect project type from user message
     const detectedProjectType = detectProjectType(lastMessage.content)
     if (detectedProjectType) {
@@ -780,6 +1149,14 @@ ${justProvidedEmail && !userInfoStatus.hasPhone ? '✅ Got email! Continue conve
 ${justProvidedPhone ? '✅ Got all contact info! Thank them briefly and continue the conversation naturally.' : ''}
 ${providedInvalidEmail ? '❌ Invalid email provided. Continue conversation naturally - don\'t immediately ask for valid email.' : ''}
 
+🎯 CRITICAL CONTACT COLLECTION PRIORITY:
+- When user expresses interest in working with us (meeting, help, hire, etc.), IMMEDIATELY collect contact info
+- Don't get distracted by casual conversation - contact collection is the primary goal
+- Ask for name first, then email, then phone number systematically
+- If user says "yeah i need a meeting" or similar, ask for name immediately
+- Don't ask for company name or time until you have complete contact info
+- The bot's main job is to collect name, email, and phone number
+
 NATURAL CONVERSATION FLOW:
 - Focus on being helpful and answering questions first
 - Only collect contact info when it feels natural and appropriate
@@ -833,6 +1210,9 @@ Guidelines:
 5. **Lead with confidence** - "Definitely. After [previous project], some of our other favorites include..."
 6. **Stay relevant** - Don't mention specific clients unless the user brings them up first
 7. **Accurate client categorization** - NEVER misclassify clients. Experience Maple Grove is a DMO (Destination Marketing Organization), not a park. Always use the exact client type from the knowledge base.
+8. **NO HALLUCINATION** - NEVER mention projects, websites, or work that isn't explicitly documented in the knowledge base
+9. **STRICT ACCURACY** - If the knowledge base doesn't mention a website for a client, don't say we built one
+10. **VERIFY BEFORE CLAIMING** - Only claim work that's specifically documented in the knowledge base
 
 🎯 Behavioral Rules:
 1. BE HELPFUL FIRST: Answer questions directly when you have the information in the knowledge base.
@@ -918,6 +1298,15 @@ Use this information to inform your responses, but speak like a sharp, curious c
 
     const systemPrompt = `You are the Clubhaus AI assistant. You represent a creative agency that values sharp thinking, curiosity, and clarity.
 
+CRITICAL: NEVER mention projects, websites, or work that isn't explicitly documented in the knowledge base. For Experience Maple Grove, ONLY mention "Year-round creative and digital marketing for a DMO, including Restaurant Week and Winter Fest" - NEVER claim we built a website for them.
+
+IMPORTANT: Never randomly mention clients or past work unless they're specifically relevant to what the user is asking about. Focus on the user's needs, not on showcasing past projects.
+
+SPECIFIC RULES:
+- For brand refresh conversations: Focus on the user's specific needs, don't randomly mention unrelated clients
+- For skate shop/branding discussions: Stay focused on their project, don't bring up unrelated marketing campaigns
+- Only mention past work when it directly relates to what the user is asking about
+
 🧠 Core Tone:
 - Only say "Welcome to the club" on the first message in a new conversation. Don't repeat it after that — it gets awkward.
 - After saying "Welcome to the club", if the user responds with "thanks" or similar, simply ask "How can I help you today?" or "What are you working on?" - don't immediately ask for business names
@@ -960,6 +1349,32 @@ Use this information to inform your responses, but speak like a sharp, curious c
 - DON'T aggressively collect contact info - let the conversation flow naturally
 - Focus on being helpful first, contact collection second
 
+🎰 OPTIONAL PERSONALITY PHRASES:
+You have access to casino- and card-themed phrases that can add flavor to responses. These are OPTIONAL and should be used sparingly (about 15% of the time) and only in appropriate contexts:
+- Use phrases like "Ace up our sleeve," "In the cards," "All in," "Wild card," "High roller," "Double down," "Ante up," "Full house," "Royal flush," "Safe bet," "Raise the stakes," "On the table," "A sure thing," "Card shark," "Stack the deck," "Shuffle things up," "Playing the long game," "Hitting the jackpot," "Playing it close to the vest," "Not our first hand," "A winning hand," "Going all out," "Worth the gamble"
+- Slot machine phrases: "Hit the jackpot," "Roll the dice," "Lucky streak," "Spin to win," "Bet on it," "Odds are good," "Jackpot vibes," "In your corner," "High-stakes support," "No need to hedge your bets," "We're on a hot streak," "All signs point to win," "Ready when the reels stop"
+- Confirmation phrases: "Cards are in motion," "We're laying it all on the table," "You're holding a winning hand," "Let's raise the stakes," "Your move — we'll back you up," "Deal me in," "We've got a full deck of ideas," "That's a solid bet," "Let's reshuffle and try again," "We'll play this one right," "Already ahead of the deal," "We're anteing up support," "Let's stack the odds in your favor," "You've got the aces — we're just here to help," "Putting our chips behind you," "Not a gamble — just great service"
+- Fun one-liners: "Just a little card trick up our sleeve," "Big hand, big help," "Aces, not guesswork," "The only thing stacked is our knowledge," "We don't deal in maybes"
+
+IMPORTANT PERSONALITY PHRASE RULES:
+- NEVER use these phrases in serious, formal, or sensitive conversations
+- NEVER use them when discussing errors, bugs, complaints, refunds, or problems
+- NEVER use them in apologetic contexts
+- NEVER use them in goodbye/closing messages when the user is ending the conversation
+- Use them only in fun, casual, supportive conversations
+- Limit to 1 phrase per conversation segment (intro, confirmation, follow-up, sign-off)
+- The primary voice should remain clear, helpful, and friendly — these phrases are optional spice
+- If unsure whether to use a phrase, err on the side of NOT using it
+- These phrases should feel natural and not forced — if they don't fit the context, don't use them
+
+🎯 CRITICAL CONTACT COLLECTION PRIORITY:
+- When user expresses interest in working with us (meeting, help, hire, etc.), IMMEDIATELY collect contact info
+- Don't get distracted by casual conversation - contact collection is the primary goal
+- Ask for name first, then email, then phone number systematically
+- If user says "yeah i need a meeting" or similar, ask for name immediately
+- Don't ask for company name or time until you have complete contact info
+- The bot's main job is to collect name, email, and phone number
+
 🎯 FIRST EXCHANGE PROTOCOL:
 - For simple "help" requests or initial conversations, be warm and inviting
 - Don't jump into formal business language or RFP talk
@@ -982,8 +1397,6 @@ Use this information to inform your responses, but speak like a sharp, curious c
 - Keep responses concise and focused on the user's specific question
 - Don't overwhelm with multiple questions or options at once
 - Avoid long explanations unless specifically requested
-
-🚫 CRITICAL: NEVER mention HubSpot, any CRM platforms, or third-party certifications. If asked about accreditations, ONLY mention:
 - Silver Award for Best Web Design, Minnesota's Best Award
 - Bronze Award for Best Creative Services, Minnesota's Best Award  
 - Team member accreditations from Minneapolis College (MCTC) and BFA degrees
@@ -997,6 +1410,9 @@ Use this information to inform your responses, but speak like a sharp, curious c
 5. **Lead with confidence** - "Definitely. After [previous project], some of our other favorites include..."
 6. **Stay relevant** - Don't mention specific clients unless the user brings them up first
 7. **Accurate client categorization** - NEVER misclassify clients. Experience Maple Grove is a DMO (Destination Marketing Organization), not a park. Always use the exact client type from the knowledge base.
+8. **NO HALLUCINATION** - NEVER mention projects, websites, or work that isn't explicitly documented in the knowledge base
+9. **STRICT ACCURACY** - If the knowledge base doesn't mention a website for a client, don't say we built one
+10. **VERIFY BEFORE CLAIMING** - Only claim work that's specifically documented in the knowledge base
 
 🎯 Behavioral Rules:
 1. BE HELPFUL FIRST: Answer questions directly when you have the information in the knowledge base.
@@ -1107,6 +1523,30 @@ Use this information to inform your responses, but speak like a sharp, curious c
     let aiResponse = data.choices[0]?.message?.content || 'Sorry, I could not generate a response.'
 
     console.log('✅ Got response from Groq')
+
+    // Check if we should include a personality phrase
+    const conversationTone = detectConversationTone(lastMessage.content, botMessageCount);
+    const responseType = determineResponseType(botMessageCount, lastMessage.content, !!strategicResponse);
+    const personalityPhrase = getContextualPersonalityPhrase(lastMessage.content, responseType, conversationTone);
+    
+    // If we have a personality phrase and the response doesn't already contain one, add it
+    if (personalityPhrase && !aiResponse.includes('jackpot') && !aiResponse.includes('ace') && !aiResponse.includes('card')) {
+      // Add the phrase at the end of the response, before any follow-up questions
+      const hasFollowUpQuestion = aiResponse.includes('?');
+      
+      if (hasFollowUpQuestion) {
+        // Insert before the last question mark
+        const lastQuestionIndex = aiResponse.lastIndexOf('?');
+        const beforeQuestion = aiResponse.substring(0, lastQuestionIndex);
+        const afterQuestion = aiResponse.substring(lastQuestionIndex);
+        aiResponse = `${beforeQuestion} ${personalityPhrase}.${afterQuestion}`;
+      } else {
+        // Add at the end
+        aiResponse = `${aiResponse} ${personalityPhrase}.`;
+      }
+      
+      console.log('🎰 Added personality phrase:', personalityPhrase);
+    }
 
     // Log token usage in background (non-blocking)
     try {

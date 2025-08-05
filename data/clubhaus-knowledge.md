@@ -6,7 +6,7 @@ Welcome to the Clubhaus AI knowledge base. This file powers the AI concierge and
 
 ## 🏢 What is Clubhaus?
 
-Clubhaus is a creative agency based in Minneapolis, MN. We specialize in brand identity, web design, AI-assisted development, and creative strategy. We're not a coworking space — we design experiences, not desks.
+Clubhaus is a creative agency based in Minneapolis, MN. We specialize in brand identity, web design, AI-assisted development, and creative strategy.
 
 ---
 

@@ -1,4 +1,5 @@
 import { projectService } from './rfpService'
+import { getContextualPersonalityPhrase } from './personalityPhrases'
 
 export interface StrategicResponse {
   triggers: string[];
@@ -1737,6 +1738,19 @@ export function formatStrategicResponse(response: StrategicResponse, userMessage
     formattedResponse += `\n\n${followUpText}`;
   }
   
+  // Optionally enhance with personality phrase (only for certain response types)
+  if (userMessage) {
+    // Simple tone detection for strategic responses
+    const messageLower = userMessage.toLowerCase();
+    const isSerious = ['error', 'bug', 'problem', 'issue', 'complaint', 'refund'].some(keyword => messageLower.includes(keyword));
+    const isFun = ['haha', 'lol', 'jk', '😊', '😄', '😂'].some(keyword => messageLower.includes(keyword));
+    
+    const conversationTone: 'casual' | 'formal' | 'serious' | 'fun' = isSerious ? 'serious' : isFun ? 'fun' : 'casual';
+    const responseType: 'intro' | 'confirmation' | 'follow-up' | 'sign-off' | 'general' = 'general';
+    
+    formattedResponse = enhanceResponseWithPersonality(formattedResponse, userMessage, responseType, conversationTone);
+  }
+  
   return formattedResponse;
 }
 
@@ -1748,4 +1762,35 @@ export function clearConversationState(sessionId: string): void {
 // Add function to get conversation state for debugging
 export function getConversationState(sessionId: string): ConversationState | undefined {
   return conversationStates.get(sessionId);
+}
+
+// Helper function to enhance strategic responses with personality phrases
+export function enhanceResponseWithPersonality(
+  response: string,
+  userMessage: string,
+  responseType: 'intro' | 'confirmation' | 'follow-up' | 'sign-off' | 'general',
+  conversationTone: 'casual' | 'formal' | 'serious' | 'fun'
+): string {
+  const personalityPhrase = getContextualPersonalityPhrase(userMessage, responseType, conversationTone);
+  
+  if (!personalityPhrase) {
+    return response;
+  }
+  
+  // Check if response already contains personality phrases
+  if (response.includes('jackpot') || response.includes('ace') || response.includes('card') || response.includes('deal')) {
+    return response;
+  }
+  
+  // Add the phrase at the end, before any follow-up questions
+  const hasFollowUpQuestion = response.includes('?');
+  
+  if (hasFollowUpQuestion) {
+    const lastQuestionIndex = response.lastIndexOf('?');
+    const beforeQuestion = response.substring(0, lastQuestionIndex);
+    const afterQuestion = response.substring(lastQuestionIndex);
+    return `${beforeQuestion} ${personalityPhrase}.${afterQuestion}`;
+  } else {
+    return `${response} ${personalityPhrase}.`;
+  }
 } 
