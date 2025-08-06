@@ -405,7 +405,7 @@ export function ChatInterface() {
                   style={{ 
                     zIndex: 100,
                     opacity: 1,
-                    pointerEvents: 'none'
+                    pointerEvents: 'auto'
                   }}
                   initial={messages.length === 0 ? {
                     width: '8rem',
@@ -479,20 +479,27 @@ export function ChatInterface() {
                     </>
                   )}
                   {/* Main GIF layer */}
-                  <motion.img 
-                    src="/gifs/Small-Transparent-messeger-app-Chip.gif" 
-                    alt="Clubhaus AI Assistant" 
-                    className="w-full h-full object-contain relative"
-                    style={{
-                      backgroundColor: 'transparent'
-                    }}
-                    whileHover={{ scale: 1.05 }}
-                    transition={{
-                      type: "spring",
-                      stiffness: 300,
-                      damping: 20
-                    }}
-                  />
+                  <a 
+                    href="https://www.clubhausagency.com" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="block w-full h-full"
+                  >
+                    <motion.img 
+                      src="/gifs/Small-Transparent-messeger-app-Chip.gif" 
+                      alt="Clubhaus AI Assistant" 
+                      className="w-full h-full object-contain relative"
+                      style={{
+                        backgroundColor: 'transparent'
+                      }}
+                      whileHover={{ scale: 1.05 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 300,
+                        damping: 20
+                      }}
+                    />
+                  </a>
                 </motion.div>
               )}
             </AnimatePresence>
