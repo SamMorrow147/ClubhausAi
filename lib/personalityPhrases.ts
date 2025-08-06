@@ -100,6 +100,11 @@ export function shouldIncludePersonalityPhrase(
     return false;
   }
   
+  // Don't use phrases in the first message (intro)
+  if (responseType === 'intro') {
+    return false;
+  }
+  
   // Don't use phrases for sensitive topics
   const sensitiveKeywords = [
     'error', 'bug', 'problem', 'issue', 'complaint', 'refund', 'cancel', 'wrong',
@@ -130,8 +135,8 @@ export function shouldIncludePersonalityPhrase(
     return false;
   }
   
-  // Use phrases more sparingly - only about 15% of the time
-  const shouldUse = Math.random() < 0.15;
+  // Use phrases more sparingly - only about 10% of the time (reduced from 15%)
+  const shouldUse = Math.random() < 0.10;
   
   return shouldUse;
 }

@@ -202,7 +202,7 @@ export class UserProfileService {
         const possibleName = nameMatch[1].trim()
         // Enhanced validation - avoid common false positives including question words
         if (possibleName.length > 1 && possibleName.length < 30 && 
-            !['yes', 'no', 'ok', 'sure', 'thanks', 'hello', 'hi', 'hey', 'what', 'why', 'how', 'when', 'where', 'who', 'which'].includes(possibleName.toLowerCase())) {
+            !['yes', 'no', 'ok', 'sure', 'thanks', 'hello', 'hi', 'what', 'why', 'how', 'when', 'where', 'who', 'which'].includes(possibleName.toLowerCase())) {
           extracted.name = possibleName
           break
         }

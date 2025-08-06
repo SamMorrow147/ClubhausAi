@@ -32,6 +32,33 @@ export interface ConversationState {
 const conversationStates = new Map<string, ConversationState>();
 
 export const STRATEGIC_RESPONSES: StrategicResponse[] = [
+  // CASUAL TESTING/EXPLORATION
+  {
+    triggers: [
+      "testing you out",
+      "testing you",
+      "just testing",
+      "testing the bot",
+      "testing this",
+      "trying you out",
+      "trying this out",
+      "just trying",
+      "exploring",
+      "just exploring",
+      "checking this out",
+      "just checking",
+      "seeing what you do",
+      "what can you do",
+      "what do you do",
+      "tell me about you",
+      "what are you",
+      "who are you"
+    ],
+    response: "Thanks! I'm here to help with creative projects and marketing. What's your name?",
+    followUp: "What kind of project are you thinking about?",
+    requiresContactInfo: true,
+    nextStep: "contact_info_collected"
+  },
   // CASUAL NOTE-TAKING OFFER
   {
     triggers: [
@@ -1789,7 +1816,10 @@ export function enhanceResponseWithPersonality(
     const lastQuestionIndex = response.lastIndexOf('?');
     const beforeQuestion = response.substring(0, lastQuestionIndex);
     const afterQuestion = response.substring(lastQuestionIndex);
-    return `${beforeQuestion} ${personalityPhrase}.${afterQuestion}`;
+    
+    // Clean up any trailing punctuation and add the phrase naturally
+    const cleanedBefore = beforeQuestion.trim().replace(/[.!]+$/, '');
+    return `${cleanedBefore}. ${personalityPhrase}${afterQuestion}`;
   } else {
     return `${response} ${personalityPhrase}.`;
   }

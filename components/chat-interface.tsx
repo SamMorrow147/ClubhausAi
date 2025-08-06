@@ -371,7 +371,7 @@ export function ChatInterface() {
   }
 
   return (
-    <div className="chat-page-container flex items-center justify-center p-4">
+    <div className="chat-page-container flex items-center justify-center p-16">
       {/* Ripple background for light mode */}
       {isLightMode && (
         <div className="ripple-background">
@@ -526,10 +526,10 @@ export function ChatInterface() {
                         variant="outline"
                         onClick={() => handleQuickQuestion(question)}
                         disabled={hasFirstMessage}
-                        className={`text-left p-3 h-auto text-sm justify-start bg-transparent transition-all duration-200 ${
+                        className={`text-left p-3 h-auto text-sm justify-start bg-transparent transition-all duration-200 button-glow-effect ${
                           isLightMode 
-                            ? 'border-blue-900/20 text-blue-900/80 hover:bg-blue-900/10 hover:text-blue-900/90 hover:border-blue-900/40 hover:shadow-[0_0_5px_rgba(59,130,246,0.2)]'
-                            : 'border-white/20 text-white/80 hover:bg-white/10 hover:text-white/90 hover:border-white/40 hover:shadow-[0_0_5px_rgba(59,130,246,0.2)]'
+                            ? 'border-blue-900/20 text-blue-900/80 hover:bg-blue-900/10 hover:text-blue-900/90 hover:border-blue-900/40'
+                            : 'border-white/20 text-white/80 hover:bg-white/10 hover:text-white/90 hover:border-white/40'
                         }`}
                       >
                         {question}

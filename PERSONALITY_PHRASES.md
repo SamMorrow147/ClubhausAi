@@ -19,12 +19,13 @@ The personality phrases are organized into four categories:
 
 The phrases are used according to strict guidelines:
 
-- **Frequency**: Only about 15% of responses include personality phrases
+- **Frequency**: Only about 10% of responses include personality phrases
 - **Context**: Only used in fun, casual, supportive conversations
 - **Avoidance**: Never used in serious, formal, or sensitive contexts
+- **First Message**: Never used in the first message of a conversation
 - **Goodbye Messages**: Never used in closing/goodbye messages
-- **Limitation**: Maximum 1 phrase per conversation segment
-- **Natural Integration**: Phrases should feel natural, not forced
+- **Natural Integration**: Phrases should feel completely natural and unforced
+- **When in Doubt**: If unsure, don't use a phrase — better to be natural than forced
 
 ### 3. Context Detection
 
@@ -76,6 +77,9 @@ The system detects conversation tone by analyzing:
 
 - User: "Thanks, that's all I need!"
 - Response: "Got it — your info's saved. We'll follow up soon. Appreciate you!" (No personality phrase)
+
+- User: "Hey, do you do logo design?" (First message)
+- Response: "Absolutely! We can help with that. What's your business name?" (No personality phrase)
 
 ## Configuration
 
