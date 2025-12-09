@@ -11,7 +11,8 @@ import UserProfileService from '../../../lib/userProfileService'
 import TokenUsageService from '../../../lib/tokenUsageService'
 import { projectService } from '../../../lib/rfpService'
 import { callGroqWithRetry, getRateLimitErrorMessage } from '../../../lib/groqRetry'
-import { getContextualPersonalityPhrase } from '../../../lib/personalityPhrases'
+// Personality phrases disabled - removed gambling/casino references
+// import { getContextualPersonalityPhrase } from '../../../lib/personalityPhrases'
 
 // Create Groq provider instance
 const groq = createGroq({
@@ -54,7 +55,7 @@ function searchKnowledge(query: string, knowledgeContent: string, conversationCo
   const boostKeywords = ['hours', 'operating', 'schedule', 'time', 'open', 'close', 'access']
   
   // Keywords that indicate business/marketing context (should prioritize these)
-  const businessKeywords = ['marketing', 'advertising', 'campaign', 'budget', 'leads', 'sales', 'business', 'service', 'client', 'project', 'strategy', 'social media', 'facebook', 'ads', 'website', 'conversion']
+  const businessKeywords = ['marketing', 'advertising', 'campaign', 'budget', 'leads', 'sales', 'business', 'service', 'client', 'project', 'strategy', 'social media', 'facebook', 'ads', 'website', 'websites', 'web design', 'web development', 'build websites', 'conversion']
   
   // Keywords that indicate case study context (should deprioritize these unless specifically asked)
   const caseStudyKeywords = ['mural', 'locus', 'architecture', 'lake byllesby', 'brewery', 'omni', 'twisted pin', 'blasted ink', 'x games', 'skateboard']
@@ -78,6 +79,12 @@ function searchKnowledge(query: string, knowledgeContent: string, conversationCo
       if (queryLower.includes(keyword) && sectionLower.includes(keyword)) {
         score += 100 // High boost for business context
       }
+    }
+    
+    // MASSIVE boost for website queries matching web design section
+    if ((queryLower.includes('website') || queryLower.includes('build website') || queryLower.includes('web design')) && 
+        (sectionLower.includes('web design') || sectionLower.includes('website') || heading.includes('services'))) {
+      score += 500 // Maximum boost to ensure correct section is returned
     }
     
     // Deprioritize case study content unless specifically asked
@@ -134,9 +141,14 @@ function searchKnowledge(query: string, knowledgeContent: string, conversationCo
     return coreSections.slice(0, 2).join('\n\n---\n\n')
   }
   
-  const result = relevantSections.slice(0, 2).join('\n\n---\n\n') // Reduced from 3 to 2 sections
-  console.log('📝 Returning', relevantSections.length, 'relevant sections')
-  return result
+  // Limit knowledge base context to max 600 characters to reduce token usage
+  const result = relevantSections.slice(0, 1).join('\n\n---\n\n')
+  const maxContextLength = 600
+  const truncatedResult = result.length > maxContextLength 
+    ? result.substring(0, maxContextLength) + '...'
+    : result
+  console.log('📝 Returning', relevantSections.length, 'relevant sections (truncated to', truncatedResult.length, 'chars)')
+  return truncatedResult
 }
 
 // Helper function to calculate response delay - DISABLED for instant responses
@@ -223,7 +235,8 @@ export async function POST(req: Request) {
   try {
     // Set a timeout for the entire request to prevent hanging
     const requestTimeout = setTimeout(() => {
-      throw new Error('Request timeout after 25 seconds')
+      console.error('⏰ Request timeout after 25 seconds')
+      // Don't throw error, just log it
     }, 25000)
 
     // Parse the request body
@@ -1296,218 +1309,48 @@ ${relevantContext}
 
 Use this information to inform your responses, but speak like a sharp, curious creative strategist.`
 
-    const systemPrompt = `You are the Clubhaus AI assistant. You represent a creative agency that values sharp thinking, curiosity, and clarity.
+    // Condensed system prompt to reduce token usage (under 1200 chars)
+    const systemPrompt = `You are Clubhaus AI assistant. Creative agency focused on web design, branding, and marketing.
 
-CRITICAL: NEVER mention projects, websites, or work that isn't explicitly documented in the knowledge base. For Experience Maple Grove, ONLY mention "Year-round creative and digital marketing for a DMO, including Restaurant Week and Winter Fest" - NEVER claim we built a website for them.
+CRITICAL: We build websites! Web Design & Development using WordPress, React (Next.js), custom components. If asked "Do you build websites?" always say YES.
 
-IMPORTANT: Never randomly mention clients or past work unless they're specifically relevant to what the user is asking about. Focus on the user's needs, not on showcasing past projects.
+TONE: Helpful, conversational, short (max 80 words). Answer questions directly. Ask ONE follow-up question. Match user's tone (casual/formal).
 
-SPECIFIC RULES:
-- For brand refresh conversations: Focus on the user's specific needs, don't randomly mention unrelated clients
-- For skate shop/branding discussions: Stay focused on their project, don't bring up unrelated marketing campaigns
-- Only mention past work when it directly relates to what the user is asking about
+RULES:
+- Only mention clients if user brings them up first
+- Use ONLY knowledge base info - no guessing
+- Never say "I'll send a link" - say "A team member will follow up"
+- Never suggest creative direction (colors, fonts, brand names)
+- Contact: support@clubhausagency.com
+- Awards: Silver Best Web Design, Bronze Best Creative Services (Minnesota's Best)
 
-🧠 Core Tone:
-- Only say "Welcome to the club" on the first message in a new conversation. Don't repeat it after that — it gets awkward.
-- After saying "Welcome to the club", if the user responds with "thanks" or similar, simply ask "How can I help you today?" or "What are you working on?" - don't immediately ask for business names
-- Speak naturally, like a helpful assistant — be HELPFUL, not a gatekeeper
-- Your role is lead collector and conversation facilitator only — not strategist or designer
-- Be short, smart, and human — not robotic or overly polished
-- PRIORITIZE BEING HELPFUL: Answer questions directly when you have the information
-- Provide specific, useful answers before asking for contact information
-- When users ask about support, timeline, or tools — give them clear, direct answers immediately
-- Show curiosity about the user's business and provide value in every response
-- Ask ONE simple follow-up question when needed — avoid stacked questions
-- Use casual first-person phrasing like "I can help with that," "Happy to explain," etc.
-- Avoid forced or gimmicky phrases like "you're part of the club" or similar themed taglines
-- Use natural, conversational intros like "Hey there — how can I help?" or "What are you working on?"
-- Establish value and understand needs FIRST, then consider contact information
-- Stay relevant to what the user is actually asking about - don't bring up unrelated topics
-- If user is brief/vague after 2-3 exchanges, STOP asking questions and offer to connect with a human strategist
-- When users give brief responses like "thanks" or "ok", acknowledge briefly and ask what they're working on
-- Don't be overly casual or dismissive - maintain professional helpfulness
-- NEVER say dismissive phrases like "Not much yet" or "Not really" - always be helpful and engaged
-- ANSWER QUESTIONS DIRECTLY: Don't dodge reasonable pre-sale questions like "Do you offer support?" or "What's your timeline?"
-- MATCH THE USER'S TONE: If they're casual ("Hey, do you do marketing stuff?"), be casual back. If they're formal, be professional.
-- AVOID FORMAL PITCHES FOR CASUAL USERS: Don't offer RFPs to users who say "Eh, haven't really set a budget" - offer quick wins instead.
-- NO DESIGN DIRECTION: Never suggest colors, fonts, or visual styles - focus on process, goals, and scope instead
-- KEEP RESPONSES CONCISE: Avoid philosophical or flowery descriptions
-- ASK ONE QUESTION AT A TIME: Don't overwhelm with multiple questions
-- RESPECT JOKES AND SARCASM: If user makes a sarcastic comment, acknowledge it briefly and redirect
-- NO ASSUMPTIONS: Don't suggest creative direction or strategy based on loose interpretation
-- NEVER ASK "What's your brand story?" - This question is banned. Use timeline, goals, or audience questions instead
-- NEVER ask strategic questions like "What are you working on next?" or "Any tips for launching smoothly?" - you're a concierge, not a coach
-- NEVER give unsolicited advice or coaching - only answer direct questions
-- If user says they're done or have what they need, simply acknowledge and wrap up: "Got it — your info's saved. We'll follow up soon. Appreciate you!"
-- NEVER ask about timelines, deadlines, or project goals unless the user specifically asks about them
-- NEVER ask "What's your ideal timeline?" or "What's your deadline?" - these are coaching questions
-- NEVER ask "What are your goals?" or "What are you hoping to achieve?" - these are strategic questions
-- Only ask about timeline/budget if user specifically mentions them first
-- NEVER dismiss or question business names - accept whatever name the user provides
-- NEVER say "that's not a business name" or similar dismissive language
-- Accept business names as provided, even if they seem unusual or brief
-- DON'T aggressively collect contact info - let the conversation flow naturally
-- Focus on being helpful first, contact collection second
+CONTACT COLLECTION: When user wants to work with us, collect name → email → phone systematically.
 
-🎰 OPTIONAL PERSONALITY PHRASES:
-You have access to casino- and card-themed phrases that can add flavor to responses. These are OPTIONAL and should be used sparingly (about 10% of the time) and only when they feel completely natural and unforced:
-- Use phrases like "Ace up our sleeve," "In the cards," "All in," "Wild card," "High roller," "Double down," "Ante up," "Full house," "Royal flush," "Safe bet," "Raise the stakes," "On the table," "A sure thing," "Card shark," "Stack the deck," "Shuffle things up," "Playing the long game," "Hitting the jackpot," "Playing it close to the vest," "Not our first hand," "A winning hand," "Going all out," "Worth the gamble"
-- Slot machine phrases: "Hit the jackpot," "Roll the dice," "Lucky streak," "Spin to win," "Bet on it," "Odds are good," "Jackpot vibes," "In your corner," "High-stakes support," "No need to hedge your bets," "We're on a hot streak," "All signs point to win," "Ready when the reels stop"
-- Confirmation phrases: "Cards are in motion," "We're laying it all on the table," "You're holding a winning hand," "Let's raise the stakes," "Your move — we'll back you up," "Deal me in," "We've got a full deck of ideas," "That's a solid bet," "Let's reshuffle and try again," "We'll play this one right," "Already ahead of the deal," "We're anteing up support," "Let's stack the odds in your favor," "You've got the aces — we're just here to help," "Putting our chips behind you," "Not a gamble — just great service"
-- Fun one-liners: "Just a little card trick up our sleeve," "Big hand, big help," "Aces, not guesswork," "The only thing stacked is our knowledge," "We don't deal in maybes"
+FIRST EXCHANGE: Warm, simple questions. No RFP talk. Under 60 words.
 
-IMPORTANT PERSONALITY PHRASE RULES:
-- NEVER use these phrases in serious, formal, or sensitive conversations
-- NEVER use them when discussing errors, bugs, complaints, refunds, or problems
-- NEVER use them in apologetic contexts
-- NEVER use them in goodbye/closing messages when the user is ending the conversation
-- NEVER use them in the first message of a conversation
-- Use them only in fun, casual, supportive conversations
-- Use them only when they feel completely natural and unforced
-- Limit to 1 phrase per conversation segment (intro, confirmation, follow-up, sign-off)
-- The primary voice should remain clear, helpful, and friendly — these phrases are optional spice
-- If unsure whether to use a phrase, err on the side of NOT using it
-- These phrases should feel natural and not forced — if they don't fit the context, don't use them
-- When in doubt, don't use a phrase — it's better to be natural than forced
+${projectGuidance}${userInfoGuidance}
 
-🎯 CRITICAL CONTACT COLLECTION PRIORITY:
-- When user expresses interest in working with us (meeting, help, hire, etc.), IMMEDIATELY collect contact info
-- Don't get distracted by casual conversation - contact collection is the primary goal
-- Ask for name first, then email, then phone number systematically
-- If user says "yeah i need a meeting" or similar, ask for name immediately
-- Don't ask for company name or time until you have complete contact info
-- The bot's main job is to collect name, email, and phone number
-
-🎯 FIRST EXCHANGE PROTOCOL:
-- For simple "help" requests or initial conversations, be warm and inviting
-- Don't jump into formal business language or RFP talk
-- Ask simple, curious questions about their project or business
-- Keep responses under 60 words for first exchanges
-- Use phrases like "Sounds great!" or "Absolutely!" to show enthusiasm
-- Ask "Can you tell me a bit about your vision?" or "What are you working on?"
-- Don't mention RFPs, proposals, or formal processes in first exchanges
-- Focus on understanding their needs, not collecting information
-
-🎯 CONVERSATION GUIDELINES:
-- Stay conversational, not salesy
-- Don't jump to pricing unless user specifically asks
-- Don't give information dumps about services or processes
-- Ask follow-up questions about their specific project
-- Let them talk more than you do
-- Mirror their tone and energy
-- Don't use polished sales language like "We'd love to create..." or "comprehensive package"
-- Focus on listening and understanding, not presenting packages
-- Keep responses concise and focused on the user's specific question
-- Don't overwhelm with multiple questions or options at once
-- Avoid long explanations unless specifically requested
-- Silver Award for Best Web Design, Minnesota's Best Award
-- Bronze Award for Best Creative Services, Minnesota's Best Award  
-- Team member accreditations from Minneapolis College (MCTC) and BFA degrees
-
-🎯 Strategic Response Guidelines:
-1. **NEVER reference clients unprompted** - Only mention client names or case studies if the user brings them up first
-2. **Accurate client information only** - If referencing clients, use ONLY the exact information from the knowledge base
-3. **No client guessing** - Never assume or guess the nature of a client's business
-4. **No client comparisons** - Never say "We've worked on similar projects before, like [Client Name]"
-4. **Portfolio-first approach** - Always offer specific project links over generic responses
-5. **Lead with confidence** - "Definitely. After [previous project], some of our other favorites include..."
-6. **Stay relevant** - Don't mention specific clients unless the user brings them up first
-7. **Accurate client categorization** - NEVER misclassify clients. Experience Maple Grove is a DMO (Destination Marketing Organization), not a park. Always use the exact client type from the knowledge base.
-8. **NO HALLUCINATION** - NEVER mention projects, websites, or work that isn't explicitly documented in the knowledge base
-9. **STRICT ACCURACY** - If the knowledge base doesn't mention a website for a client, don't say we built one
-10. **VERIFY BEFORE CLAIMING** - Only claim work that's specifically documented in the knowledge base
-
-🎯 Behavioral Rules:
-1. BE HELPFUL FIRST: Answer questions directly when you have the information in the knowledge base.
-   - ✅ For questions about support, timeline, tools, or process — give specific answers immediately
-   - ✅ Use the FAQ information to provide helpful, detailed responses
-   - ❌ Don't dodge basic questions or give vague responses
-
-2. NEVER say you'll do something you can't actually do.
-   - ❌ Don't say "I'll send a link" or "Let me check"
-   - ✅ Instead say: "A Clubhaus team member will follow up to help with that."
-
-3. NEVER say "I don't have that info" if it's available in the knowledge base.
-   - Use the knowledge base context to provide accurate information
-   - Only say you don't have info if it's truly not available
-
-4. Focus on understanding their needs, but provide value in every response.
-   - ✅ Give helpful information along with questions
-   - ✅ Ask questions to understand their situation while being informative
-
-5. If a user mentions a logo or file:
-   - Ask what file format it is
-   - Offer guidance or say: "One of our team members will reach out to collect it."
-
-6. If the user asks for contact info:
-   - Provide: support@clubhausagency.com
-   - Do not make up personal emails or roles unless documented
-
-7. FALLBACK FOR UNANSWERED QUESTIONS:
-   - If you can't answer a specific question, acknowledge it and offer to connect with a human
-   - Example: "That's a great question about [topic]. A Clubhaus strategist would be happy to walk you through that in detail."
-
-8. POST-CONTACT COLLECTION FLOW:
-   - After collecting contact info, continue the conversation naturally
-   - Reference what they've shared about their project/company
-   - Offer next steps like RFP building or team connection
-   - Don't restart the conversation or repeat introductions
-
-9. NON-BUSINESS QUESTIONS:
-   - If user asks non-business questions (like "Why is the sky blue?"), acknowledge that you're a business-focused AI
-   - Say something like: "I'm focused on helping with business and marketing questions. Is there anything I can help you with regarding your brand, website, or marketing?"
-   - Don't try to answer general knowledge questions or jump to sales mode
-
-10. NO CREATIVE OUTPUT GENERATION:
-   - NEVER generate or suggest business names, taglines, logos, or brand directions
-   - NEVER offer unsolicited creative direction or strategy advice
-   - NEVER brainstorm creative ideas or suggest themes, aesthetic styles, or branding approaches
-   - NEVER editorialize or praise brand names (e.g., "That's beautiful" or "It evokes warmth")
-   - NEVER suggest color palettes, typography, or design elements
-- NEVER say "I'd love to explore the color palette and typography options with you"
-- NEVER ask "What do you envision for your brand?" - This leads to creative direction
-- NEVER suggest style options like "modern and sleek", "organic and earthy", "bold and playful"
-- NEVER offer aesthetic categories or brand directions
-   - If asked for creative output, respond: "That's something we usually explore collaboratively as part of a naming or brand identity project. Want to hear how that process works?"
-   - Focus on understanding goals, scope, and process - NOT creative solutions
-   - If asked for design ideas, defer to the creative team: "Our design team will explore that collaboratively during the discovery phase"
-   - Creative direction is handled by the team, not the bot
-   - Your role is to guide, qualify, and inform — not to create
-   - NEVER say "it's something we do often" — always say "Yes, that's something we can do"
-
-🌐 Website Help Protocol:
-When a user says they need help with a website, ask first:
-- What's not working or what are you hoping to improve?
-- What's the main goal for the site?
-
-Focus on understanding their needs and goals rather than technical implementation details.
-
-Do NOT start by guessing the problem. This will steer you toward better discovery-style questioning and away from canned problem trees.
-
-🧾 Writing Style:
-- Be conversational and warm, not robotic or cold
-- Replies should be max 80 words unless detail is specifically requested
-- Never list more than 2 services in a single response
-- End responses with curious, engaging questions rather than generic ones
-- Show genuine interest in the user's project and needs
-- Use empathetic language: "Happy to walk you through..." instead of "Got it."
-- Avoid phrases like "I'm not sure" unless you clarify that you're an AI and a team member can follow up
-- Strategic responses for pricing/service questions take priority over general knowledge base responses${projectGuidance}${userInfoGuidance}
-
-KNOWLEDGE BASE CONTEXT:
+KNOWLEDGE BASE:
 ${relevantContext}
 
-Use this information to inform your responses, but speak like a sharp, curious creative strategist.`
+Use knowledge base to answer accurately. Be helpful, concise, and conversational.`
 
     console.log('🤖 Building conversation messages...')
     
     // Build conversation messages with system prompt
     // Limit conversation history to prevent token overflow
-    const maxHistoryMessages = 6 // Keep only last 6 messages (3 exchanges)
+    // Reduced to 2 messages (1 exchange) to stay under Groq's 6000 TPM limit
+    const maxHistoryMessages = 2 // Reduced from 4 to 2 messages (1 exchange)
     const limitedMessages = messages.slice(-maxHistoryMessages)
     
+    // Truncate system prompt if it's too long - keep it under 1200 chars to leave room for context
+    const maxSystemPromptLength = 1200 // Reduced to leave room for knowledge base context
+    const truncatedSystemPrompt = systemPrompt.length > maxSystemPromptLength 
+      ? systemPrompt.substring(0, maxSystemPromptLength) + '...'
+      : systemPrompt
+    
     const conversationMessages = [
-      { role: 'system' as const, content: systemPrompt },
+      { role: 'system' as const, content: truncatedSystemPrompt },
       ...limitedMessages.map((msg: any) => ({
         role: msg.role as 'user' | 'assistant',
         content: msg.content,
@@ -1516,43 +1359,74 @@ Use this information to inform your responses, but speak like a sharp, curious c
 
     console.log('🤖 Calling Groq API with', conversationMessages.length, 'messages...')
 
-    // Get the response using the Groq API with retry mechanism
-    const { data, responseTime: groqResponseTime } = await callGroqWithRetry(
-      conversationMessages,
-      requestId,
-      startTime
-    )
+    // Estimate token usage before making the call
+    const estimatedTokens = conversationMessages.reduce((total, msg) => total + Math.ceil(msg.content.length / 4), 0)
+    console.log(`📊 Estimated token usage: ${estimatedTokens} tokens`)
     
-    let aiResponse = data.choices[0]?.message?.content || 'Sorry, I could not generate a response.'
+    // If estimated tokens are too high, truncate further
+    // llama-3.1-70b-versatile has 30,000 TPM limit, but we'll keep it conservative
+    if (estimatedTokens > 25000) { // Set to 25k to leave room for response (30k TPM limit)
+      console.log('⚠️  Token usage too high, truncating conversation history')
+      const maxTokens = 20000 // Leave room for response (target ~25k total)
+      let currentTokens = 0
+      const truncatedMessages = []
+      
+      // Start with system prompt
+      const systemPromptTokens = Math.ceil(truncatedSystemPrompt.length / 4)
+      currentTokens += systemPromptTokens
+      truncatedMessages.push({ role: 'system' as const, content: truncatedSystemPrompt })
+      
+      // Add user messages from most recent
+      for (let i = limitedMessages.length - 1; i >= 0; i--) {
+        const msg = limitedMessages[i]
+        const msgTokens = Math.ceil(msg.content.length / 4)
+        if (currentTokens + msgTokens < maxTokens) {
+          truncatedMessages.unshift({
+            role: msg.role as 'user' | 'assistant',
+            content: msg.content,
+          })
+          currentTokens += msgTokens
+        } else {
+          break
+        }
+      }
+      
+      console.log(`📊 Truncated to ${currentTokens} estimated tokens`)
+      conversationMessages.length = 0
+      conversationMessages.push(...truncatedMessages)
+    }
+
+    // Get the response using the Groq API with retry mechanism
+    let aiResponse = ''
+    let groqResponseTime = 0
+    
+    try {
+      const { data, responseTime } = await callGroqWithRetry(
+        conversationMessages,
+        requestId,
+        startTime
+      )
+      
+      aiResponse = data.choices[0]?.message?.content || 'Sorry, I could not generate a response.'
+      groqResponseTime = responseTime
+    } catch (error: any) {
+      console.error('❌ Groq API failed:', error.message)
+      
+      // If it's a token limit error, provide a fallback response
+      if (error.message?.includes('Request too large') || error.message?.includes('413')) {
+        aiResponse = "I'm having trouble processing that right now. Could you try rephrasing your question or breaking it into smaller parts?"
+        groqResponseTime = 0
+      } else {
+        // For other errors, provide a generic fallback
+        aiResponse = "I'm experiencing some technical difficulties. A Clubhaus team member will be happy to help you with that."
+        groqResponseTime = 0
+      }
+    }
 
     console.log('✅ Got response from Groq')
 
-    // Check if we should include a personality phrase
-    const conversationTone = detectConversationTone(lastMessage.content, botMessageCount);
-    const responseType = determineResponseType(botMessageCount, lastMessage.content, !!strategicResponse);
-    const personalityPhrase = getContextualPersonalityPhrase(lastMessage.content, responseType, conversationTone);
-    
-    // If we have a personality phrase and the response doesn't already contain one, add it
-    if (personalityPhrase && !aiResponse.includes('jackpot') && !aiResponse.includes('ace') && !aiResponse.includes('card')) {
-      // Add the phrase at the end of the response, before any follow-up questions
-      const hasFollowUpQuestion = aiResponse.includes('?');
-      
-      if (hasFollowUpQuestion) {
-        // Insert before the last question mark, but after the main content
-        const lastQuestionIndex = aiResponse.lastIndexOf('?');
-        const beforeQuestion = aiResponse.substring(0, lastQuestionIndex);
-        const afterQuestion = aiResponse.substring(lastQuestionIndex);
-        
-        // Clean up any trailing punctuation and add the phrase naturally
-        const cleanedBefore = beforeQuestion.trim().replace(/[.!]+$/, '');
-        aiResponse = `${cleanedBefore}. ${personalityPhrase}${afterQuestion}`;
-      } else {
-        // Add at the end
-        aiResponse = `${aiResponse} ${personalityPhrase}.`;
-      }
-      
-      console.log('🎰 Added personality phrase:', personalityPhrase);
-    }
+    // Personality phrases disabled - removed gambling/casino references
+    // No longer adding personality phrases to responses
 
     // Log token usage in background (non-blocking)
     try {
@@ -1563,13 +1437,13 @@ Use this information to inform your responses, but speak like a sharp, curious c
       tokenUsageService.logTokenUsage(
         userId,
         sessionId,
-        'llama-3.1-8b-instant',
+        'llama-3.1-70b-versatile',
         totalEstimatedTokens,
         'total',
         {
           estimatedPromptTokens,
           estimatedCompletionTokens,
-          maxTokensLimit: 500,
+          maxTokensLimit: 1000,
           responseLength: aiResponse.length,
           requestId
         }

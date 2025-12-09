@@ -1,0 +1,56 @@
+[
+  {
+    "id": "token_1765316553053_43ti7ze1x",
+    "date": "2025-12-09",
+    "timestamp": "2025-12-09T21:42:33.053Z",
+    "userId": "anonymous",
+    "sessionId": "session_1765316533321_pqkwoari9",
+    "model": "openai/gpt-oss-20b",
+    "tokensUsed": 644,
+    "tokenType": "total",
+    "metadata": {
+      "estimatedPromptTokens": 582,
+      "estimatedCompletionTokens": 62,
+      "maxTokensLimit": 1000,
+      "responseLength": 246,
+      "requestId": "req_1765316552569_ke2qhzydj",
+      "platform": "chat_ui"
+    }
+  },
+  {
+    "id": "token_1765316568441_wfru1vf2h",
+    "date": "2025-12-09",
+    "timestamp": "2025-12-09T21:42:48.441Z",
+    "userId": "anonymous",
+    "sessionId": "session_1765316533321_pqkwoari9",
+    "model": "openai/gpt-oss-20b",
+    "tokensUsed": 667,
+    "tokenType": "total",
+    "metadata": {
+      "estimatedPromptTokens": 644,
+      "estimatedCompletionTokens": 23,
+      "maxTokensLimit": 1000,
+      "responseLength": 90,
+      "requestId": "req_1765316568184_tzh8auehb",
+      "platform": "chat_ui"
+    }
+  },
+  {
+    "id": "token_1765316610765_7eurvlaqx",
+    "date": "2025-12-09",
+    "timestamp": "2025-12-09T21:43:30.765Z",
+    "userId": "anonymous",
+    "sessionId": "session_1765316606170_rkhvfd5d3",
+    "model": "openai/gpt-oss-20b",
+    "tokensUsed": 576,
+    "tokenType": "total",
+    "metadata": {
+      "estimatedPromptTokens": 507,
+      "estimatedCompletionTokens": 69,
+      "maxTokensLimit": 1000,
+      "responseLength": 275,
+      "requestId": "req_1765316610110_9vwssru38",
+      "platform": "chat_ui"
+    }
+  }
+]

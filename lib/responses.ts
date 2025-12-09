@@ -1,5 +1,6 @@
 import { projectService } from './rfpService'
-import { getContextualPersonalityPhrase } from './personalityPhrases'
+// Personality phrases disabled - removed gambling/casino references
+// import { getContextualPersonalityPhrase } from './personalityPhrases'
 
 export interface StrategicResponse {
   triggers: string[];
@@ -610,6 +611,19 @@ export const STRATEGIC_RESPONSES: StrategicResponse[] = [
     ],
     response: "That really depends — how good do you want it to be? A quick logo with no real strategy can be pretty cheap. A well-crafted brand identity rooted in research, positioning, and storytelling is an investment — but it shows. I can walk you through both.",
     followUp: "Does that sound like what you're looking for?"
+  },
+  {
+    triggers: [
+      "do you build websites",
+      "do you make websites",
+      "can you build a website",
+      "can you make a website",
+      "do you create websites",
+      "website development",
+      "web development services"
+    ],
+    response: "Yes, we absolutely build websites! We create conversion-focused, mobile-first sites using WordPress, React (Next.js), and custom components. We also build AI-integrated UIs and interactive experiences. What kind of website are you thinking about?",
+    followUp: "Is this for a business, portfolio, or something else?"
   },
   {
     triggers: [
@@ -1765,18 +1779,8 @@ export function formatStrategicResponse(response: StrategicResponse, userMessage
     formattedResponse += `\n\n${followUpText}`;
   }
   
-  // Optionally enhance with personality phrase (only for certain response types)
-  if (userMessage) {
-    // Simple tone detection for strategic responses
-    const messageLower = userMessage.toLowerCase();
-    const isSerious = ['error', 'bug', 'problem', 'issue', 'complaint', 'refund'].some(keyword => messageLower.includes(keyword));
-    const isFun = ['haha', 'lol', 'jk', '😊', '😄', '😂'].some(keyword => messageLower.includes(keyword));
-    
-    const conversationTone: 'casual' | 'formal' | 'serious' | 'fun' = isSerious ? 'serious' : isFun ? 'fun' : 'casual';
-    const responseType: 'intro' | 'confirmation' | 'follow-up' | 'sign-off' | 'general' = 'general';
-    
-    formattedResponse = enhanceResponseWithPersonality(formattedResponse, userMessage, responseType, conversationTone);
-  }
+  // Personality phrases disabled - no longer adding gambling/casino references
+  // Removed personality phrase enhancement
   
   return formattedResponse;
 }
@@ -1791,36 +1795,14 @@ export function getConversationState(sessionId: string): ConversationState | und
   return conversationStates.get(sessionId);
 }
 
-// Helper function to enhance strategic responses with personality phrases
+// Personality phrases disabled - removed gambling/casino references
+// Helper function to enhance strategic responses (now disabled)
 export function enhanceResponseWithPersonality(
   response: string,
   userMessage: string,
   responseType: 'intro' | 'confirmation' | 'follow-up' | 'sign-off' | 'general',
   conversationTone: 'casual' | 'formal' | 'serious' | 'fun'
 ): string {
-  const personalityPhrase = getContextualPersonalityPhrase(userMessage, responseType, conversationTone);
-  
-  if (!personalityPhrase) {
-    return response;
-  }
-  
-  // Check if response already contains personality phrases
-  if (response.includes('jackpot') || response.includes('ace') || response.includes('card') || response.includes('deal')) {
-    return response;
-  }
-  
-  // Add the phrase at the end, before any follow-up questions
-  const hasFollowUpQuestion = response.includes('?');
-  
-  if (hasFollowUpQuestion) {
-    const lastQuestionIndex = response.lastIndexOf('?');
-    const beforeQuestion = response.substring(0, lastQuestionIndex);
-    const afterQuestion = response.substring(lastQuestionIndex);
-    
-    // Clean up any trailing punctuation and add the phrase naturally
-    const cleanedBefore = beforeQuestion.trim().replace(/[.!]+$/, '');
-    return `${cleanedBefore}. ${personalityPhrase}${afterQuestion}`;
-  } else {
-    return `${response} ${personalityPhrase}.`;
-  }
+  // Personality phrases disabled - just return the response as-is
+  return response;
 } 

@@ -1,6 +1,6 @@
 // Retry configuration for Groq API calls
 export const GROQ_RETRY_CONFIG = {
-  maxRetries: 3,
+  maxRetries: 2, // Reduced from 3 to 2
   baseDelay: 1000, // 1 second
   maxDelay: 10000, // 10 seconds
   jitter: 0.1, // 10% jitter
@@ -30,6 +30,11 @@ export function isRetryableError(status: number, errorData: any): boolean {
     return true
   }
   
+  // Token limit errors (413) - these are NOT retryable as they indicate the request is too large
+  if (status === 413 || errorData?.error?.message?.includes('Request too large')) {
+    return false
+  }
+  
   // Server errors (5xx) that might be temporary
   if (status >= 500 && status < 600) return true
   
@@ -56,10 +61,10 @@ export async function callGroqWithRetry(
           'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
         },
         body: JSON.stringify({
-          model: 'llama-3.1-8b-instant',
+          model: 'llama-3.1-70b-versatile', // Higher token limit (30,000 TPM) than llama-3.1-8b-instant
           messages: conversationMessages,
           temperature: 0.7,
-          max_tokens: 500,
+          max_tokens: 1000,
         }),
       })
 
