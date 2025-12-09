@@ -1372,6 +1372,34 @@ Use knowledge base to answer accurately. Be helpful, concise, and conversational
       groqResponseTime = responseTime
     } catch (error: any) {
       console.error('❌ Groq API failed:', error.message)
+      console.error('❌ Groq API error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+        requestId,
+        estimatedTokens
+      })
+      
+      // Log the error to database for debugging
+      try {
+        await logger.logAIResponse(userId, `🚨 GROQ API ERROR: ${error.message}`, {
+          sessionId,
+          requestId,
+          responseTime: Date.now() - startTime,
+          isError: true,
+          errorType: 'GROQ_API_ERROR',
+          errorDetails: {
+            message: error.message,
+            name: error.name,
+            stack: error.stack?.substring(0, 500),
+            estimatedTokens
+          },
+          platform: 'chat_ui',
+          type: 'groq_api_error'
+        })
+      } catch (logError) {
+        console.error('❌ Failed to log Groq error:', logError)
+      }
       
       // If it's a token limit error, provide a fallback response
       if (error.message?.includes('Request too large') || error.message?.includes('413')) {
@@ -1398,7 +1426,7 @@ Use knowledge base to answer accurately. Be helpful, concise, and conversational
       tokenUsageService.logTokenUsage(
         userId,
         sessionId,
-        'llama-3.1-70b-versatile',
+        'mixtral-8x7b-32768',
         totalEstimatedTokens,
         'total',
         {

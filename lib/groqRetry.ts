@@ -61,7 +61,7 @@ export async function callGroqWithRetry(
           'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
         },
         body: JSON.stringify({
-          model: 'llama-3.1-70b-versatile', // Higher token limit (30,000 TPM) than llama-3.1-8b-instant
+          model: 'mixtral-8x7b-32768', // Very high token limit (32k context, 30k+ TPM)
           messages: conversationMessages,
           temperature: 0.7,
           max_tokens: 2000, // Increased from 1000 to allow longer responses
@@ -72,9 +72,17 @@ export async function callGroqWithRetry(
       console.log(`⏱️ Groq API response time: ${groqResponseTime}ms`)
 
       if (!response.ok) {
-        const errorData = await response.json()
-        console.error(`❌ Groq API error (attempt ${attempt + 1}):`, errorData)
+        let errorData: any
+        try {
+          errorData = await response.json()
+        } catch (e) {
+          errorData = { error: { message: await response.text() || `HTTP ${response.status}: ${response.statusText}` } }
+        }
+        
+        console.error(`❌ Groq API error (attempt ${attempt + 1}):`, JSON.stringify(errorData, null, 2))
         console.error(`❌ Response status: ${response.status}`)
+        console.error(`❌ Model being used: llama-3.1-70b-versatile`)
+        console.error(`❌ Request body size: ${JSON.stringify(conversationMessages).length} chars`)
         
         // Check if this is a retryable error
         if (isRetryableError(response.status, errorData)) {
@@ -89,7 +97,8 @@ export async function callGroqWithRetry(
         }
         
         // Non-retryable error or max retries reached
-        throw new Error(`Groq API error: ${errorData.error?.message || 'Unknown error'} (Status: ${response.status})`)
+        const errorMessage = errorData.error?.message || errorData.message || 'Unknown error'
+        throw new Error(`Groq API error: ${errorMessage} (Status: ${response.status})`)
       }
 
       const data = await response.json()
