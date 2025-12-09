@@ -1426,7 +1426,7 @@ Use knowledge base to answer accurately. Be helpful, concise, and conversational
       tokenUsageService.logTokenUsage(
         userId,
         sessionId,
-        'mixtral-8x7b-32768',
+        'llama-3.1-70b-versatile',
         totalEstimatedTokens,
         'total',
         {

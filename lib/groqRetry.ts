@@ -61,7 +61,7 @@ export async function callGroqWithRetry(
           'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
         },
         body: JSON.stringify({
-          model: 'mixtral-8x7b-32768', // Very high token limit (32k context, 30k+ TPM)
+          model: 'llama-3.1-70b-versatile', // Higher token limit (30,000 TPM) than llama-3.1-8b-instant
           messages: conversationMessages,
           temperature: 0.7,
           max_tokens: 2000, // Increased from 1000 to allow longer responses
