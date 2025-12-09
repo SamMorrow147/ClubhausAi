@@ -298,15 +298,15 @@ export async function POST(req: Request) {
     })
     
     // Additional validation for names - reject common phrases and non-name patterns
-    if (extractedInfo.name) {
+      if (extractedInfo.name) {
       const nameLower = extractedInfo.name.toLowerCase()
-      
+        
       // Reject question words
       const questionWords = ['what', 'why', 'how', 'when', 'where', 'who', 'which']
       if (questionWords.includes(nameLower)) {
-        console.log('❌ Rejected name extraction - appears to be a question word:', extractedInfo.name)
-        delete extractedInfo.name
-      }
+          console.log('❌ Rejected name extraction - appears to be a question word:', extractedInfo.name)
+          delete extractedInfo.name
+        }
       
       // Reject phrases that start with articles - these are almost never names
       if (nameLower.startsWith('a ') || nameLower.startsWith('an ') || nameLower.startsWith('the ')) {
@@ -327,12 +327,57 @@ export async function POST(req: Request) {
       
       if (containsNonNameWord || containsNonNamePhrase) {
         console.log('❌ Rejected name extraction - contains non-name words/phrases:', extractedInfo.name)
-        delete extractedInfo.name
+          delete extractedInfo.name
+        }
       }
-    }
+      
+      if (Object.keys(extractedInfo).length > 0) {
+        console.log('👤 Extracted user info:', extractedInfo)
+      }
     
-    if (Object.keys(extractedInfo).length > 0) {
-      console.log('👤 Extracted user info:', extractedInfo)
+    // PRIORITY 0: Handle simple greetings with a friendly welcome
+    const greetingKeywords = ['hey', 'hi', 'hello', 'howdy', 'greetings', 'sup', 'what\'s up', 'whats up']
+    const isSimpleGreeting = botMessageCount === 0 && 
+                            greetingKeywords.some(keyword => 
+                              lastMessage.content.toLowerCase().trim() === keyword || 
+                              lastMessage.content.toLowerCase().trim() === keyword + '!' ||
+                              lastMessage.content.toLowerCase().trim() === keyword + '.'
+                            ) &&
+                            lastMessage.content.length < 20 // Very short message
+    
+    if (isSimpleGreeting) {
+      console.log('👋 Simple greeting detected - responding with welcome')
+      
+      const welcomeMessages = [
+        "Hey! Welcome to Clubhaus. How can I help you today?",
+        "Hi there! Welcome to Clubhaus. What can I help you with?",
+        "Hello! Welcome to Clubhaus. How can I assist you today?",
+        "Hey! Welcome to Clubhaus. What brings you here?"
+      ]
+      
+      const welcomeMessage = welcomeMessages[Math.floor(Math.random() * welcomeMessages.length)]
+      
+      logger.logAIResponse(userId, welcomeMessage, {
+        sessionId,
+        projectType: 'greeting',
+        requestId,
+        responseTime: Date.now() - startTime,
+        isGreeting: true
+      }).catch(logError => {
+        console.error('❌ Failed to log greeting message:', logError)
+      })
+
+      return new Response(
+        JSON.stringify({ 
+          message: welcomeMessage,
+          context: 'Simple greeting response',
+          debug: { requestId, responseType: 'GREETING', responseTime: Date.now() - startTime }
+        }),
+        { 
+          status: 200, 
+          headers: { 'Content-Type': 'application/json' } 
+        }
+      )
     }
     
     // CRITICAL: PRIORITY 1 - Check for meeting/help requests that require contact info collection FIRST
@@ -594,30 +639,30 @@ export async function POST(req: Request) {
       if (extractedInfo.phone) {
         // If we have phone but missing email, ask for email
         if (!updatedUserInfoStatus.hasEmail) {
-          const nextContactMessage = "Thanks! What's your email address?"
-          
-          logger.logAIResponse(userId, nextContactMessage, {
-            sessionId,
-            projectType: 'contact_capture',
-            requestId,
-            responseTime: Date.now() - startTime,
-            isContactCapture: true,
-            providedInfo: extractedInfo
-          }).catch(logError => {
-            console.error('❌ Failed to log contact capture message:', logError)
-          })
+        const nextContactMessage = "Thanks! What's your email address?"
+        
+        logger.logAIResponse(userId, nextContactMessage, {
+          sessionId,
+          projectType: 'contact_capture',
+          requestId,
+          responseTime: Date.now() - startTime,
+          isContactCapture: true,
+          providedInfo: extractedInfo
+        }).catch(logError => {
+          console.error('❌ Failed to log contact capture message:', logError)
+        })
 
-          return new Response(
-            JSON.stringify({ 
-              message: nextContactMessage,
-              context: 'Contact capture - asking for email after phone',
-              debug: { requestId, responseType: 'CONTACT_CAPTURE_EMAIL_FOLLOWUP', responseTime: Date.now() - startTime }
-            }),
-            { 
-              status: 200, 
-              headers: { 'Content-Type': 'application/json' } 
-            }
-          )
+        return new Response(
+          JSON.stringify({ 
+            message: nextContactMessage,
+            context: 'Contact capture - asking for email after phone',
+            debug: { requestId, responseType: 'CONTACT_CAPTURE_EMAIL_FOLLOWUP', responseTime: Date.now() - startTime }
+          }),
+          { 
+            status: 200, 
+            headers: { 'Content-Type': 'application/json' } 
+          }
+        )
         }
         // If we have phone but missing name, ask for name
         else if (!updatedUserInfoStatus.hasName) {
@@ -1386,6 +1431,8 @@ RULES:
 - Never suggest creative direction (colors, fonts, brand names)
 - Contact: support@clubhausagency.com
 - Awards: Silver Best Web Design, Bronze Best Creative Services (Minnesota's Best)
+
+GREETINGS: If user just says "hey", "hi", or "hello", respond with a friendly welcome like "Hey! Welcome to Clubhaus. How can I help you today?" - don't immediately jump to "We build websites" or sales talk.
 
 CONTACT COLLECTION: When user wants to work with us, collect name → email → phone systematically.
 
