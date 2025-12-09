@@ -141,14 +141,10 @@ function searchKnowledge(query: string, knowledgeContent: string, conversationCo
     return coreSections.slice(0, 2).join('\n\n---\n\n')
   }
   
-  // Limit knowledge base context to max 600 characters to reduce token usage
-  const result = relevantSections.slice(0, 1).join('\n\n---\n\n')
-  const maxContextLength = 600
-  const truncatedResult = result.length > maxContextLength 
-    ? result.substring(0, maxContextLength) + '...'
-    : result
-  console.log('📝 Returning', relevantSections.length, 'relevant sections (truncated to', truncatedResult.length, 'chars)')
-  return truncatedResult
+  // Return knowledge base context without truncation
+  const result = relevantSections.slice(0, 2).join('\n\n---\n\n') // Return up to 2 sections
+  console.log('📝 Returning', relevantSections.length, 'relevant sections')
+  return result
 }
 
 // Helper function to calculate response delay - DISABLED for instant responses
@@ -1338,16 +1334,11 @@ Use knowledge base to answer accurately. Be helpful, concise, and conversational
     console.log('🤖 Building conversation messages...')
     
     // Build conversation messages with system prompt
-    // Limit conversation history to prevent token overflow
-    // Reduced to 2 messages (1 exchange) to stay under Groq's 6000 TPM limit
-    const maxHistoryMessages = 2 // Reduced from 4 to 2 messages (1 exchange)
-    const limitedMessages = messages.slice(-maxHistoryMessages)
+    // Use full conversation history - no limits
+    const limitedMessages = messages.slice(-10) // Use last 10 messages (5 exchanges)
     
-    // Truncate system prompt if it's too long - keep it under 1200 chars to leave room for context
-    const maxSystemPromptLength = 1200 // Reduced to leave room for knowledge base context
-    const truncatedSystemPrompt = systemPrompt.length > maxSystemPromptLength 
-      ? systemPrompt.substring(0, maxSystemPromptLength) + '...'
-      : systemPrompt
+    // Use full system prompt - no truncation
+    const truncatedSystemPrompt = systemPrompt
     
     const conversationMessages = [
       { role: 'system' as const, content: truncatedSystemPrompt },
@@ -1363,38 +1354,8 @@ Use knowledge base to answer accurately. Be helpful, concise, and conversational
     const estimatedTokens = conversationMessages.reduce((total, msg) => total + Math.ceil(msg.content.length / 4), 0)
     console.log(`📊 Estimated token usage: ${estimatedTokens} tokens`)
     
-    // If estimated tokens are too high, truncate further
-    // llama-3.1-70b-versatile has 30,000 TPM limit, but we'll keep it conservative
-    if (estimatedTokens > 25000) { // Set to 25k to leave room for response (30k TPM limit)
-      console.log('⚠️  Token usage too high, truncating conversation history')
-      const maxTokens = 20000 // Leave room for response (target ~25k total)
-      let currentTokens = 0
-      const truncatedMessages = []
-      
-      // Start with system prompt
-      const systemPromptTokens = Math.ceil(truncatedSystemPrompt.length / 4)
-      currentTokens += systemPromptTokens
-      truncatedMessages.push({ role: 'system' as const, content: truncatedSystemPrompt })
-      
-      // Add user messages from most recent
-      for (let i = limitedMessages.length - 1; i >= 0; i--) {
-        const msg = limitedMessages[i]
-        const msgTokens = Math.ceil(msg.content.length / 4)
-        if (currentTokens + msgTokens < maxTokens) {
-          truncatedMessages.unshift({
-            role: msg.role as 'user' | 'assistant',
-            content: msg.content,
-          })
-          currentTokens += msgTokens
-        } else {
-          break
-        }
-      }
-      
-      console.log(`📊 Truncated to ${currentTokens} estimated tokens`)
-      conversationMessages.length = 0
-      conversationMessages.push(...truncatedMessages)
-    }
+    // No token truncation - let the model handle it
+    // The model has 30,000 TPM limit which should be sufficient
 
     // Get the response using the Groq API with retry mechanism
     let aiResponse = ''

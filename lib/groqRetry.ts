@@ -64,7 +64,7 @@ export async function callGroqWithRetry(
           model: 'llama-3.1-70b-versatile', // Higher token limit (30,000 TPM) than llama-3.1-8b-instant
           messages: conversationMessages,
           temperature: 0.7,
-          max_tokens: 1000,
+          max_tokens: 2000, // Increased from 1000 to allow longer responses
         }),
       })
 
