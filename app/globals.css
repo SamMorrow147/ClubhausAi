@@ -460,17 +460,23 @@
     padding-right: 0;
     margin-left: 0;
     margin-right: 0;
-    position: absolute;
+    position: fixed;
     bottom: 0;
     left: 0;
     right: 0;
-    z-index: 20;
-    background: transparent;
+    z-index: 9999;
+    background: var(--card-bg);
     padding-bottom: calc(env(safe-area-inset-bottom) + 10px);
     border-top: 1px solid rgba(255, 255, 255, 0.1);
     /* Define exact height to match messages-container bottom value */
-    height: 100px;
+    min-height: 100px;
     box-sizing: border-box;
+    /* Ensure it stays visible when keyboard appears */
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    /* Add backdrop for better visibility */
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
   }
   
   /* Prevent scrolling when keyboard is open */
@@ -598,7 +604,7 @@
   
   /* Ensure adequate bottom padding for messages on mobile */
   .messages-list {
-    padding-bottom: 5rem; /* Slightly less on mobile due to smaller input area */
+    padding-bottom: 7rem; /* Extra padding to account for fixed input container */
   }
   
   /* Light mode sticky header */
@@ -609,7 +615,7 @@
   
   /* Light mode input container */
   .light .input-container {
-    background: transparent;
+    background: var(--card-bg);
     box-shadow: 0 -10px 20px hsl(260, 25%, 95%);
   }
 }

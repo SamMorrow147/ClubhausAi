@@ -371,7 +371,7 @@ export function ChatInterface() {
   }
 
   return (
-    <div className="chat-page-container flex items-center justify-center p-16">
+    <div className="chat-page-container flex items-center justify-center p-[5px] md:p-16">
       {/* Ripple background for light mode */}
       {isLightMode && (
         <div className="ripple-background">
@@ -519,7 +519,7 @@ export function ChatInterface() {
                   }}
                 >
                   <motion.p 
-                    className={`mb-6 ${isLightMode ? 'text-blue-900/80' : 'text-white/80'}`}
+                    className={`mb-6 px-[5px] ${isLightMode ? 'text-blue-900/80' : 'text-white/80'}`}
                   >
                     A Clubhaus AI built to talk with you about your project or our business. Whether you're here to build something bold or just exploring, I'm here to help.
                   </motion.p>
