@@ -284,24 +284,55 @@ export async function POST(req: Request) {
     userId = 'anonymous' // In a real app, this would come from authentication
     sessionId = providedSessionId || `session_${Date.now()}`
     
-    // Extract user information from the message - but be more conservative about names
-    const extractedInfo = userProfileService.extractUserInfoFromMessage(lastMessage.content)
+    // Check if we just asked for name/email/phone to provide context for extraction
+    const sessionLogs = await logger.getLogsBySession(sessionId)
+    const lastBotMessage = sessionLogs.filter(log => log.role === 'assistant').pop()
+    const askedForName = lastBotMessage?.content?.toLowerCase().includes("what's your name") || 
+                         lastBotMessage?.content?.toLowerCase().includes("your name")
+    const askedForEmail = lastBotMessage?.content?.toLowerCase().includes("email")
+    const askedForPhone = lastBotMessage?.content?.toLowerCase().includes("phone")
     
-    // Additional validation for names - only accept if it's clearly a name
-    if (Object.keys(extractedInfo).length > 0) {
-      if (extractedInfo.name) {
-        const questionWords = ['what', 'why', 'how', 'when', 'where', 'who', 'which']
-        const isQuestionWord = questionWords.includes(extractedInfo.name.toLowerCase())
-        
-        if (isQuestionWord) {
-          console.log('❌ Rejected name extraction - appears to be a question word:', extractedInfo.name)
+    // Extract user information from the message with context
+    const extractedInfo = userProfileService.extractUserInfoFromMessage(lastMessage.content, {
+      askedForName: !!askedForName
+    })
+    
+    // Additional validation for names - reject common phrases and non-name patterns
+    if (extractedInfo.name) {
+      const nameLower = extractedInfo.name.toLowerCase()
+      
+      // Reject question words
+      const questionWords = ['what', 'why', 'how', 'when', 'where', 'who', 'which']
+      if (questionWords.includes(nameLower)) {
+        console.log('❌ Rejected name extraction - appears to be a question word:', extractedInfo.name)
+        delete extractedInfo.name
+      }
+      
+      // Reject phrases that start with articles - these are almost never names
+      if (nameLower.startsWith('a ') || nameLower.startsWith('an ') || nameLower.startsWith('the ')) {
+        // Reject ALL multi-word phrases starting with articles (very unlikely to be a name)
+        const words = nameLower.split(/\s+/)
+        if (words.length > 1) {
+          console.log('❌ Rejected name extraction - starts with article and is multi-word:', extractedInfo.name)
           delete extractedInfo.name
         }
       }
       
-      if (Object.keys(extractedInfo).length > 0) {
-        console.log('👤 Extracted user info:', extractedInfo)
+      // Reject if it contains common non-name words/phrases
+      const nonNameWords = ['package', 'design', 'website', 'logo', 'brand', 'project', 'business', 'company', 'help', 'need', 'want', 'looking', 'for', 'create', 'build', 'make', 'working', 'on']
+      const nonNamePhrases = ['package design', 'web design', 'logo design', 'brand design', 'a package', 'a design']
+      
+      const containsNonNameWord = nonNameWords.some(word => nameLower.includes(word) && nameLower !== word)
+      const containsNonNamePhrase = nonNamePhrases.some(phrase => nameLower.includes(phrase))
+      
+      if (containsNonNameWord || containsNonNamePhrase) {
+        console.log('❌ Rejected name extraction - contains non-name words/phrases:', extractedInfo.name)
+        delete extractedInfo.name
       }
+    }
+    
+    if (Object.keys(extractedInfo).length > 0) {
+      console.log('👤 Extracted user info:', extractedInfo)
     }
     
     // CRITICAL: PRIORITY 1 - Check for meeting/help requests that require contact info collection FIRST
@@ -559,32 +590,62 @@ export async function POST(req: Request) {
         )
       }
       
-      // If user provided phone, ask for email
-      if (extractedInfo.phone && !updatedUserInfoStatus.hasEmail) {
-        const nextContactMessage = "Thanks! What's your email address?"
-        
-        logger.logAIResponse(userId, nextContactMessage, {
-          sessionId,
-          projectType: 'contact_capture',
-          requestId,
-          responseTime: Date.now() - startTime,
-          isContactCapture: true,
-          providedInfo: extractedInfo
-        }).catch(logError => {
-          console.error('❌ Failed to log contact capture message:', logError)
-        })
+      // If user provided phone, check what's missing
+      if (extractedInfo.phone) {
+        // If we have phone but missing email, ask for email
+        if (!updatedUserInfoStatus.hasEmail) {
+          const nextContactMessage = "Thanks! What's your email address?"
+          
+          logger.logAIResponse(userId, nextContactMessage, {
+            sessionId,
+            projectType: 'contact_capture',
+            requestId,
+            responseTime: Date.now() - startTime,
+            isContactCapture: true,
+            providedInfo: extractedInfo
+          }).catch(logError => {
+            console.error('❌ Failed to log contact capture message:', logError)
+          })
 
-        return new Response(
-          JSON.stringify({ 
-            message: nextContactMessage,
-            context: 'Contact capture - asking for email after phone',
-            debug: { requestId, responseType: 'CONTACT_CAPTURE_EMAIL_FOLLOWUP', responseTime: Date.now() - startTime }
-          }),
-          { 
-            status: 200, 
-            headers: { 'Content-Type': 'application/json' } 
-          }
-        )
+          return new Response(
+            JSON.stringify({ 
+              message: nextContactMessage,
+              context: 'Contact capture - asking for email after phone',
+              debug: { requestId, responseType: 'CONTACT_CAPTURE_EMAIL_FOLLOWUP', responseTime: Date.now() - startTime }
+            }),
+            { 
+              status: 200, 
+              headers: { 'Content-Type': 'application/json' } 
+            }
+          )
+        }
+        // If we have phone but missing name, ask for name
+        else if (!updatedUserInfoStatus.hasName) {
+          const nextContactMessage = "Great! What's your name?"
+          
+          logger.logAIResponse(userId, nextContactMessage, {
+            sessionId,
+            projectType: 'contact_capture',
+            requestId,
+            responseTime: Date.now() - startTime,
+            isContactCapture: true,
+            providedInfo: extractedInfo
+          }).catch(logError => {
+            console.error('❌ Failed to log contact capture message:', logError)
+          })
+
+          return new Response(
+            JSON.stringify({ 
+              message: nextContactMessage,
+              context: 'Contact capture - asking for name after phone',
+              debug: { requestId, responseType: 'CONTACT_CAPTURE_NAME_FOLLOWUP', responseTime: Date.now() - startTime }
+            }),
+            { 
+              status: 200, 
+              headers: { 'Content-Type': 'application/json' } 
+            }
+          )
+        }
       }
       
       // If we now have complete contact info, proceed with meeting setup
@@ -1165,6 +1226,8 @@ ${providedInvalidEmail ? '❌ Invalid email provided. Continue conversation natu
 - If user says "yeah i need a meeting" or similar, ask for name immediately
 - Don't ask for company name or time until you have complete contact info
 - The bot's main job is to collect name, email, and phone number
+- NEVER ask for the same piece of contact info twice in a row
+- If the system is already asking for contact info, DON'T also ask for it in your response
 
 NATURAL CONVERSATION FLOW:
 - Focus on being helpful and answering questions first

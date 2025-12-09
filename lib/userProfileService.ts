@@ -210,7 +210,8 @@ export class UserProfileService {
     }
 
     // If no explicit pattern found, check for simple name response
-    if (!extracted.name) {
+    // ONLY if we explicitly asked for a name (to avoid false positives)
+    if (!extracted.name && context?.askedForName) {
       const trimmedMessage = message.trim()
       
       // Check if the message looks like a simple name response
@@ -220,19 +221,36 @@ export class UserProfileService {
         const possibleName = trimmedMessage.trim()
         
         // Enhanced validation for simple name responses
-        if (possibleName.length > 1 && possibleName.length < 30 && 
-            !['yes', 'no', 'ok', 'sure', 'thanks', 'hello', 'hi', 'hey', 'what', 'why', 'how', 'when', 'where', 'who', 'which'].includes(possibleName.toLowerCase())) {
-          // Additional check: avoid common non-name words
-          const commonWords = ['the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'up', 'down', 'out', 'off', 'over', 'under', 'again', 'further', 'then', 'once', 'here', 'there', 'when', 'where', 'why', 'how', 'all', 'any', 'both', 'each', 'few', 'more', 'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own', 'same', 'so', 'than', 'too', 'very', 'can', 'will', 'just', 'should', 'now']
+        if (possibleName.length > 1 && possibleName.length < 30) {
+          // Reject common non-name phrases
+          const rejectPhrases = [
+            'yes', 'no', 'ok', 'sure', 'thanks', 'hello', 'hi', 'hey', 
+            'what', 'why', 'how', 'when', 'where', 'who', 'which',
+            'a package', 'package design', 'package', 'design', 'a design',
+            'the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 
+            'with', 'by', 'from', 'up', 'down', 'out', 'off', 'over', 'under',
+            'all', 'any', 'both', 'each', 'few', 'more', 'most', 'other', 
+            'some', 'such', 'not', 'only', 'own', 'same', 'so', 'than', 'too', 
+            'very', 'can', 'will', 'just', 'should', 'now', 'need', 'want',
+            'help', 'website', 'web', 'site', 'logo', 'brand', 'marketing'
+          ]
           
-          // If we just asked for a name, be more lenient with the validation
-          const isNameContext = context?.askedForName
+          const lowerName = possibleName.toLowerCase()
           
-          if (!commonWords.includes(possibleName.toLowerCase()) || isNameContext) {
-            // If we asked for a name, accept it even if it's a common word (like "sam")
-            if (isNameContext || !commonWords.includes(possibleName.toLowerCase())) {
-              extracted.name = possibleName
-            }
+          // Reject if it contains any reject phrases
+          const shouldReject = rejectPhrases.some(phrase => 
+            lowerName === phrase || lowerName.includes(phrase) || lowerName.startsWith(phrase + ' ') || lowerName.endsWith(' ' + phrase)
+          )
+          
+          // Also reject if it starts with articles (a, an, the) unless it's a single word
+          const words = possibleName.split(/\s+/)
+          if (words.length > 1 && ['a', 'an', 'the'].includes(words[0].toLowerCase())) {
+            // Reject phrases like "a package design"
+            return extracted
+          }
+          
+          if (!shouldReject) {
+            extracted.name = possibleName
           }
         }
       }
