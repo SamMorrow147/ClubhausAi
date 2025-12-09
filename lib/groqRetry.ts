@@ -61,7 +61,7 @@ export async function callGroqWithRetry(
           'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
         },
         body: JSON.stringify({
-          model: 'llama-3.1-70b-versatile', // Higher token limit (30,000 TPM) than llama-3.1-8b-instant
+          model: 'llama-3.3-70b-versatile', // Updated model name (replacement for llama-3.1-70b-versatile)
           messages: conversationMessages,
           temperature: 0.7,
           max_tokens: 2000, // Increased from 1000 to allow longer responses
@@ -81,7 +81,7 @@ export async function callGroqWithRetry(
         
         console.error(`❌ Groq API error (attempt ${attempt + 1}):`, JSON.stringify(errorData, null, 2))
         console.error(`❌ Response status: ${response.status}`)
-        console.error(`❌ Model being used: llama-3.1-70b-versatile`)
+        console.error(`❌ Model being used: llama-3.3-70b-versatile`)
         console.error(`❌ Request body size: ${JSON.stringify(conversationMessages).length} chars`)
         
         // Check if this is a retryable error
