@@ -1,4 +1,4 @@
-import { createClient } from 'redis'
+import { neon } from '@neondatabase/serverless'
 
 export interface ChatLog {
   id: string
@@ -12,7 +12,7 @@ export interface ChatLog {
 
 export class DatabaseLogger {
   private static instance: DatabaseLogger
-  private redis: any = null
+  private sql: any = null
   private isConnected: boolean = false
 
   private constructor() {}
@@ -24,25 +24,25 @@ export class DatabaseLogger {
     return DatabaseLogger.instance
   }
 
-  private async getRedisClient() {
-    if (this.redis && this.isConnected) {
-      return this.redis
+  private async getDatabaseConnection() {
+    if (this.sql && this.isConnected) {
+      return this.sql
     }
 
     try {
-      // Use Vercel KV environment variables
-      const redis = createClient({
-        url: process.env.KV_REST_API_URL,
-        password: process.env.KV_REST_API_TOKEN,
-      })
+      // Use Neon database URL
+      const databaseUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL
+      if (!databaseUrl) {
+        console.error('❌ DATABASE_URL or POSTGRES_URL not set')
+        return null
+      }
 
-      await redis.connect()
-      this.redis = redis
+      this.sql = neon(databaseUrl)
       this.isConnected = true
-      console.log('✅ Redis client connected')
-      return redis
+      console.log('✅ Neon database connected')
+      return this.sql
     } catch (error) {
-      console.error('❌ Failed to connect to Redis:', error)
+      console.error('❌ Failed to connect to Neon database:', error)
       this.isConnected = false
       return null
     }
@@ -57,40 +57,27 @@ export class DatabaseLogger {
     metadata: Record<string, any> = {}
   ): Promise<void> {
     try {
-      const redis = await this.getRedisClient()
-      if (!redis) {
-        console.log('⚠️ Redis not available, skipping log')
+      const sql = await this.getDatabaseConnection()
+      if (!sql) {
+        console.log('⚠️ Database not available, skipping log')
         return
       }
 
       const sessionId = metadata.sessionId || `session_${Date.now()}`
+      const id = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      const timestamp = new Date().toISOString()
+      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
       
-      const logEntry: ChatLog = {
-        id: `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        userId,
-        sessionId,
-        role: 'user',
-        content: message,
-        timestamp: new Date().toISOString(),
-        metadata: {
-          ...metadata,
-          platform: 'chat_ui',
-          type: 'user_input'
-        }
+      const logMetadata = {
+        ...metadata,
+        platform: 'chat_ui',
+        type: 'user_input'
       }
 
-      // Store in Redis with a unique key
-      const key = `chat_log:${logEntry.id}`
-      await redis.set(key, JSON.stringify(logEntry))
-      
-      // Also store in a list for easy retrieval
-      await redis.lPush(`user_logs:${userId}`, logEntry.id)
-      await redis.lPush(`session_logs:${sessionId}`, logEntry.id)
-      
-      // Set expiration for cleanup (30 days)
-      await redis.expire(key, 30 * 24 * 60 * 60)
-      await redis.expire(`user_logs:${userId}`, 30 * 24 * 60 * 60)
-      await redis.expire(`session_logs:${sessionId}`, 30 * 24 * 60 * 60)
+      await sql`
+        INSERT INTO chat_logs (id, user_id, session_id, role, content, metadata, created_at, expires_at)
+        VALUES (${id}, ${userId}, ${sessionId}, 'user', ${message}, ${JSON.stringify(logMetadata)}::jsonb, ${timestamp}::timestamptz, ${expiresAt}::timestamptz)
+      `
 
       console.log('📝 Logged user message for user:', userId, '(Database)')
     } catch (error) {
@@ -108,41 +95,28 @@ export class DatabaseLogger {
     metadata: Record<string, any> = {}
   ): Promise<void> {
     try {
-      const redis = await this.getRedisClient()
-      if (!redis) {
-        console.log('⚠️ Redis not available, skipping log')
-        console.error('❌ Redis connection failed - KV_REST_API_URL:', !!process.env.KV_REST_API_URL, 'KV_REST_API_TOKEN:', !!process.env.KV_REST_API_TOKEN)
+      const sql = await this.getDatabaseConnection()
+      if (!sql) {
+        console.log('⚠️ Database not available, skipping log')
+        console.error('❌ Database connection failed - DATABASE_URL:', !!process.env.DATABASE_URL, 'POSTGRES_URL:', !!process.env.POSTGRES_URL)
         return
       }
 
       const sessionId = metadata.sessionId || `session_${Date.now()}`
+      const id = `ai_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      const timestamp = new Date().toISOString()
+      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
       
-      const logEntry: ChatLog = {
-        id: `ai_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        userId,
-        sessionId,
-        role: 'assistant',
-        content: response,
-        timestamp: new Date().toISOString(),
-        metadata: {
-          ...metadata,
-          platform: 'chat_ui',
-          type: 'ai_response'
-        }
+      const logMetadata = {
+        ...metadata,
+        platform: 'chat_ui',
+        type: 'ai_response'
       }
 
-      // Store in Redis with a unique key
-      const key = `chat_log:${logEntry.id}`
-      await redis.set(key, JSON.stringify(logEntry))
-      
-      // Also store in a list for easy retrieval
-      await redis.lPush(`user_logs:${userId}`, logEntry.id)
-      await redis.lPush(`session_logs:${sessionId}`, logEntry.id)
-      
-      // Set expiration for cleanup (30 days)
-      await redis.expire(key, 30 * 24 * 60 * 60)
-      await redis.expire(`user_logs:${userId}`, 30 * 24 * 60 * 60)
-      await redis.expire(`session_logs:${sessionId}`, 30 * 24 * 60 * 60)
+      await sql`
+        INSERT INTO chat_logs (id, user_id, session_id, role, content, metadata, created_at, expires_at)
+        VALUES (${id}, ${userId}, ${sessionId}, 'assistant', ${response}, ${JSON.stringify(logMetadata)}::jsonb, ${timestamp}::timestamptz, ${expiresAt}::timestamptz)
+      `
 
       console.log('🤖 Logged AI response for user:', userId, '(Database)')
     } catch (error) {
@@ -157,25 +131,29 @@ export class DatabaseLogger {
    */
   async getAllChatLogs(userId: string): Promise<ChatLog[]> {
     try {
-      const redis = await this.getRedisClient()
-      if (!redis) {
-        console.log('⚠️ Redis not available, returning empty logs')
+      const sql = await this.getDatabaseConnection()
+      if (!sql) {
+        console.log('⚠️ Database not available, returning empty logs')
         return []
       }
 
-      const logIds = await redis.lRange(`user_logs:${userId}`, 0, -1)
-      const logs: ChatLog[] = []
+      const rows = await sql`
+        SELECT id, user_id, session_id, role, content, metadata, created_at
+        FROM chat_logs
+        WHERE user_id = ${userId}
+          AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)
+        ORDER BY created_at DESC
+      `
       
-      for (const id of logIds) {
-        const logData = await redis.get(`chat_log:${id}`)
-        if (logData) {
-          const log = JSON.parse(logData) as ChatLog
-          logs.push(log)
-        }
-      }
-      
-      // Sort by timestamp (newest first)
-      return logs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      return rows.map((row: any) => ({
+        id: row.id,
+        userId: row.user_id,
+        sessionId: row.session_id,
+        role: row.role,
+        content: row.content,
+        timestamp: row.created_at,
+        metadata: row.metadata || {}
+      }))
     } catch (error) {
       console.error('❌ Failed to get chat logs from database:', error)
       return []
@@ -187,26 +165,28 @@ export class DatabaseLogger {
    */
   async getAllLogs(): Promise<ChatLog[]> {
     try {
-      const redis = await this.getRedisClient()
-      if (!redis) {
-        console.log('⚠️ Redis not available, returning empty logs')
+      const sql = await this.getDatabaseConnection()
+      if (!sql) {
+        console.log('⚠️ Database not available, returning empty logs')
         return []
       }
 
-      // Get all chat log keys
-      const keys = await redis.keys('chat_log:*')
-      const logs: ChatLog[] = []
+      const rows = await sql`
+        SELECT id, user_id, session_id, role, content, metadata, created_at
+        FROM chat_logs
+        WHERE expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP
+        ORDER BY created_at DESC
+      `
       
-      for (const key of keys) {
-        const logData = await redis.get(key)
-        if (logData) {
-          const log = JSON.parse(logData) as ChatLog
-          logs.push(log)
-        }
-      }
-      
-      // Sort by timestamp (newest first)
-      return logs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      return rows.map((row: any) => ({
+        id: row.id,
+        userId: row.user_id,
+        sessionId: row.session_id,
+        role: row.role,
+        content: row.content,
+        timestamp: row.created_at,
+        metadata: row.metadata || {}
+      }))
     } catch (error) {
       console.error('❌ Failed to get all logs from database:', error)
       return []
@@ -218,25 +198,29 @@ export class DatabaseLogger {
    */
   async getLogsBySession(sessionId: string): Promise<ChatLog[]> {
     try {
-      const redis = await this.getRedisClient()
-      if (!redis) {
-        console.log('⚠️ Redis not available, returning empty logs')
+      const sql = await this.getDatabaseConnection()
+      if (!sql) {
+        console.log('⚠️ Database not available, returning empty logs')
         return []
       }
 
-      const logIds = await redis.lRange(`session_logs:${sessionId}`, 0, -1)
-      const logs: ChatLog[] = []
+      const rows = await sql`
+        SELECT id, user_id, session_id, role, content, metadata, created_at
+        FROM chat_logs
+        WHERE session_id = ${sessionId}
+          AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)
+        ORDER BY created_at ASC
+      `
       
-      for (const id of logIds) {
-        const logData = await redis.get(`chat_log:${id}`)
-        if (logData) {
-          const log = JSON.parse(logData) as ChatLog
-          logs.push(log)
-        }
-      }
-      
-      // Sort by timestamp (oldest first for conversation flow)
-      return logs.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+      return rows.map((row: any) => ({
+        id: row.id,
+        userId: row.user_id,
+        sessionId: row.session_id,
+        role: row.role,
+        content: row.content,
+        timestamp: row.created_at,
+        metadata: row.metadata || {}
+      }))
     } catch (error) {
       console.error('❌ Failed to get session logs from database:', error)
       return []
@@ -248,21 +232,16 @@ export class DatabaseLogger {
    */
   async deleteAllChatLogs(userId: string): Promise<void> {
     try {
-      const redis = await this.getRedisClient()
-      if (!redis) {
-        console.log('⚠️ Redis not available, skipping delete')
+      const sql = await this.getDatabaseConnection()
+      if (!sql) {
+        console.log('⚠️ Database not available, skipping delete')
         return
       }
 
-      const logIds = await redis.lRange(`user_logs:${userId}`, 0, -1)
-      
-      // Delete individual log entries
-      for (const id of logIds) {
-        await redis.del(`chat_log:${id}`)
-      }
-      
-      // Delete the user's log list
-      await redis.del(`user_logs:${userId}`)
+      await sql`
+        DELETE FROM chat_logs
+        WHERE user_id = ${userId}
+      `
       
       console.log('🗑️ Deleted all chat logs for user:', userId, '(Database)')
     } catch (error) {
@@ -275,26 +254,13 @@ export class DatabaseLogger {
    */
   async resetAllChatLogs(): Promise<void> {
     try {
-      const redis = await this.getRedisClient()
-      if (!redis) {
-        console.log('⚠️ Redis not available, skipping reset')
+      const sql = await this.getDatabaseConnection()
+      if (!sql) {
+        console.log('⚠️ Database not available, skipping reset')
         return
       }
 
-      const keys = await redis.keys('chat_log:*')
-      for (const key of keys) {
-        await redis.del(key)
-      }
-      
-      const userKeys = await redis.keys('user_logs:*')
-      for (const key of userKeys) {
-        await redis.del(key)
-      }
-      
-      const sessionKeys = await redis.keys('session_logs:*')
-      for (const key of sessionKeys) {
-        await redis.del(key)
-      }
+      await sql`TRUNCATE TABLE chat_logs`
       
       console.log('🔄 Reset all chat logs (Database)')
     } catch (error) {
@@ -343,15 +309,14 @@ export class DatabaseLogger {
    */
   async testConnection(): Promise<boolean> {
     try {
-      const redis = await this.getRedisClient()
-      if (!redis) {
+      const sql = await this.getDatabaseConnection()
+      if (!sql) {
         return false
       }
 
-      await redis.set('test_connection', 'ok')
-      const result = await redis.get('test_connection')
-      await redis.del('test_connection')
-      return result === 'ok'
+      // Test connection by running a simple query
+      const result = await sql`SELECT 1 as test`
+      return result && result.length > 0
     } catch (error) {
       console.error('❌ Database connection test failed:', error)
       return false
@@ -359,14 +324,13 @@ export class DatabaseLogger {
   }
 
   /**
-   * Close Redis connection
+   * Close database connection (no-op for Neon serverless)
    */
   async disconnect(): Promise<void> {
-    if (this.redis && this.isConnected) {
-      await this.redis.disconnect()
-      this.isConnected = false
-      console.log('🔌 Redis client disconnected')
-    }
+    // Neon serverless driver doesn't require explicit connection closing
+    this.isConnected = false
+    this.sql = null
+    console.log('🔌 Database connection closed')
   }
 }
 

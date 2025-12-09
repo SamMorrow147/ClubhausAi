@@ -12,13 +12,9 @@ export async function GET() {
         startsWith: process.env.GROQ_API_KEY?.substring(0, 10) || 'N/A',
         length: process.env.GROQ_API_KEY?.length || 0
       },
-      KV_REST_API_URL: {
-        exists: !!process.env.KV_REST_API_URL,
-        startsWith: process.env.KV_REST_API_URL?.substring(0, 20) || 'N/A'
-      },
-      KV_REST_API_TOKEN: {
-        exists: !!process.env.KV_REST_API_TOKEN,
-        startsWith: process.env.KV_REST_API_TOKEN?.substring(0, 10) || 'N/A'
+      DATABASE_URL: {
+        exists: !!process.env.DATABASE_URL || !!process.env.POSTGRES_URL,
+        startsWith: (process.env.DATABASE_URL || process.env.POSTGRES_URL)?.substring(0, 20) || 'N/A'
       },
       NODE_ENV: process.env.NODE_ENV,
       VERCEL_ENV: process.env.VERCEL_ENV,

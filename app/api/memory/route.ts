@@ -18,9 +18,8 @@ export async function GET(req: NextRequest) {
       
       // Add debug information
       debugInfo = {
-        hasRedisUrl: !!process.env.KV_REST_API_URL,
-        hasRedisToken: !!process.env.KV_REST_API_TOKEN,
-        redisUrlPrefix: process.env.KV_REST_API_URL?.substring(0, 10) || 'not set',
+        hasDatabaseUrl: !!process.env.DATABASE_URL || !!process.env.POSTGRES_URL,
+        databaseUrlPrefix: (process.env.DATABASE_URL || process.env.POSTGRES_URL)?.substring(0, 20) || 'not set',
         hasGroqKey: !!process.env.GROQ_API_KEY,
         groqKeyPrefix: process.env.GROQ_API_KEY?.substring(0, 10) || 'not set'
       }

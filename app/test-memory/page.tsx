@@ -261,7 +261,7 @@ export default function TestMemoryPage() {
                   </p>
                 ) : dbConnectionStatus === false ? (
                   <p className="text-red-300">
-                    ❌ <strong>Database Connection Failed:</strong> Logs may not be persisting. Check Vercel KV configuration.
+                    ❌ <strong>Database Connection Failed:</strong> Logs may not be persisting. Check Neon database configuration (DATABASE_URL).
                   </p>
                 ) : (
                   <p>
