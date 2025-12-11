@@ -1079,8 +1079,8 @@ export async function POST(req: Request) {
             // Skip to budget if timeline is already known
             currentProjectFlow.step = 'budget'
             projectService.updateBudget(sessionId, lastMessage.content)
-            const responseMessage = "Thanks! Do you already have a budget range or cap in mind?"
-            logger.logAIResponse(userId, responseMessage, {
+            const serviceTypeSkipMessage = "Thanks! Do you already have a budget range or cap in mind?"
+            logger.logAIResponse(userId, serviceTypeSkipMessage, {
               sessionId,
               projectType: 'project_flow',
               requestId,
@@ -1092,7 +1092,7 @@ export async function POST(req: Request) {
             })
             return new Response(
               JSON.stringify({
-                message: responseMessage,
+                message: serviceTypeSkipMessage,
                 context: 'Project flow - service type collected, timeline already known',
                 debug: { requestId, responseType: 'PROJECT_SERVICE_COLLECTED_SKIP_TIMELINE', responseTime: Date.now() - startTime }
               }),
@@ -1100,8 +1100,8 @@ export async function POST(req: Request) {
             )
           }
           
-          const responseMessage = "Got it. What's your ideal timeline or deadline for this project?"
-          logger.logAIResponse(userId, responseMessage, {
+          const serviceTypeMessage = "Got it. What's your ideal timeline or deadline for this project?"
+          logger.logAIResponse(userId, serviceTypeMessage, {
             sessionId,
             projectType: 'project_flow',
             requestId,
@@ -1113,7 +1113,7 @@ export async function POST(req: Request) {
           })
           return new Response(
             JSON.stringify({
-              message: responseMessage,
+              message: serviceTypeMessage,
               context: 'Project flow - service type collected',
               debug: { requestId, responseType: 'PROJECT_SERVICE_COLLECTED', responseTime: Date.now() - startTime }
             }),
@@ -1128,8 +1128,8 @@ export async function POST(req: Request) {
             // Skip to goals if budget is already known
             currentProjectFlow.step = 'goals'
             projectService.updateGoals(sessionId, lastMessage.content)
-            const responseMessage = "Understood. What outcomes or goals are you hoping this project achieves? (e.g., increased sales, better UX, new product launch, rebranding)"
-            logger.logAIResponse(userId, responseMessage, {
+            const timelineSkipMessage = "Understood. What outcomes or goals are you hoping this project achieves? (e.g., increased sales, better UX, new product launch, rebranding)"
+            logger.logAIResponse(userId, timelineSkipMessage, {
               sessionId,
               projectType: 'project_flow',
               requestId,
@@ -1141,7 +1141,7 @@ export async function POST(req: Request) {
             })
             return new Response(
               JSON.stringify({
-                message: responseMessage,
+                message: timelineSkipMessage,
                 context: 'Project flow - timeline collected, budget already known',
                 debug: { requestId, responseType: 'PROJECT_TIMELINE_COLLECTED_SKIP_BUDGET', responseTime: Date.now() - startTime }
               }),
@@ -1149,8 +1149,8 @@ export async function POST(req: Request) {
             )
           }
           
-          const responseMessage = "Thanks! Do you already have a budget range or cap in mind?"
-          logger.logAIResponse(userId, responseMessage, {
+          const timelineMessage = "Thanks! Do you already have a budget range or cap in mind?"
+          logger.logAIResponse(userId, timelineMessage, {
             sessionId,
             projectType: 'project_flow',
             requestId,
@@ -1162,7 +1162,7 @@ export async function POST(req: Request) {
           })
           return new Response(
             JSON.stringify({
-              message: responseMessage,
+              message: timelineMessage,
               context: 'Project flow - timeline collected',
               debug: { requestId, responseType: 'PROJECT_TIMELINE_COLLECTED', responseTime: Date.now() - startTime }
             }),
@@ -1202,8 +1202,8 @@ export async function POST(req: Request) {
             }
           }
           
-          const responseMessage = "Understood. What outcomes or goals are you hoping this project achieves? (e.g., increased sales, better UX, new product launch, rebranding)"
-          logger.logAIResponse(userId, responseMessage, {
+          const budgetMessage = "Understood. What outcomes or goals are you hoping this project achieves? (e.g., increased sales, better UX, new product launch, rebranding)"
+          logger.logAIResponse(userId, budgetMessage, {
             sessionId,
             projectType: 'project_flow',
             requestId,
@@ -1215,7 +1215,7 @@ export async function POST(req: Request) {
           })
           return new Response(
             JSON.stringify({
-              message: responseMessage,
+              message: budgetMessage,
               context: 'Project flow - budget collected',
               debug: { requestId, responseType: 'PROJECT_BUDGET_COLLECTED', responseTime: Date.now() - startTime }
             }),
