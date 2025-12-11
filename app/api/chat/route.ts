@@ -901,6 +901,18 @@ export async function POST(req: Request) {
         
         const formattedResponse = formatStrategicResponse(strategicResponse, lastMessage.content, sessionId)
         
+        // Log the strategic response
+        logger.logAIResponse(userId, formattedResponse, {
+          sessionId,
+          projectType: 'rfp_initiated',
+          requestId,
+          responseTime: Date.now() - startTime,
+          isStrategicResponse: true,
+          isRFPInitiated: true
+        }).catch(logError => {
+          console.error('❌ Failed to log strategic RFP response:', logError)
+        })
+        
         return new Response(
           JSON.stringify({
             message: formattedResponse,
@@ -913,6 +925,17 @@ export async function POST(req: Request) {
       
       // Regular strategic response
       const formattedResponse = formatStrategicResponse(strategicResponse, lastMessage.content, sessionId)
+      
+      // Log the strategic response
+      logger.logAIResponse(userId, formattedResponse, {
+        sessionId,
+        projectType: 'strategic_response',
+        requestId,
+        responseTime: Date.now() - startTime,
+        isStrategicResponse: true
+      }).catch(logError => {
+        console.error('❌ Failed to log strategic response:', logError)
+      })
       
       return new Response(
         JSON.stringify({ 
@@ -936,6 +959,18 @@ export async function POST(req: Request) {
       if (projectTrigger.name === "AI Agent Introduction") {
         console.log('🔄 Skipping AI identity trigger - conversation already started')
       } else {
+        // Log the project trigger response
+        logger.logAIResponse(userId, projectTrigger.response.text, {
+          sessionId,
+          projectType: projectTrigger.name.toLowerCase().replace(/\s+/g, '_'),
+          requestId,
+          responseTime: Date.now() - startTime,
+          isProjectTrigger: true,
+          triggerName: projectTrigger.name
+        }).catch(logError => {
+          console.error('❌ Failed to log project trigger response:', logError)
+        })
+        
         return new Response(
           JSON.stringify({ 
             message: projectTrigger.response.text,
@@ -995,18 +1030,40 @@ export async function POST(req: Request) {
           const contactInfo = projectService.extractContactInfo(lastMessage.content)
           if (contactInfo) {
             projectService.updateContactInfo(sessionId, contactInfo)
+            const responseMessage = "Great! What type of service or product are you requesting a proposal for?"
+            logger.logAIResponse(userId, responseMessage, {
+              sessionId,
+              projectType: 'project_flow',
+              requestId,
+              responseTime: Date.now() - startTime,
+              isProjectFlow: true,
+              flowStep: 'contact_info_collected'
+            }).catch(logError => {
+              console.error('❌ Failed to log project flow response:', logError)
+            })
             return new Response(
               JSON.stringify({
-                message: "Great! What type of service or product are you requesting a proposal for?",
+                message: responseMessage,
                 context: 'Project flow - contact info collected',
                 debug: { requestId, responseType: 'PROJECT_CONTACT_COLLECTED', responseTime: Date.now() - startTime }
               }),
               { status: 200, headers: { 'Content-Type': 'application/json' } }
             )
           } else {
+            const responseMessage = "I need your name, email, and phone number to get started. Could you provide those?"
+            logger.logAIResponse(userId, responseMessage, {
+              sessionId,
+              projectType: 'project_flow',
+              requestId,
+              responseTime: Date.now() - startTime,
+              isProjectFlow: true,
+              flowStep: 'contact_info_needed'
+            }).catch(logError => {
+              console.error('❌ Failed to log project flow response:', logError)
+            })
             return new Response(
               JSON.stringify({
-                message: "I need your name, email, and phone number to get started. Could you provide those?",
+                message: responseMessage,
                 context: 'Project flow - contact info needed',
                 debug: { requestId, responseType: 'PROJECT_CONTACT_NEEDED', responseTime: Date.now() - startTime }
               }),
@@ -1022,9 +1079,20 @@ export async function POST(req: Request) {
             // Skip to budget if timeline is already known
             currentProjectFlow.step = 'budget'
             projectService.updateBudget(sessionId, lastMessage.content)
+            const responseMessage = "Thanks! Do you already have a budget range or cap in mind?"
+            logger.logAIResponse(userId, responseMessage, {
+              sessionId,
+              projectType: 'project_flow',
+              requestId,
+              responseTime: Date.now() - startTime,
+              isProjectFlow: true,
+              flowStep: 'service_type_collected_skip_timeline'
+            }).catch(logError => {
+              console.error('❌ Failed to log project flow response:', logError)
+            })
             return new Response(
               JSON.stringify({
-                message: "Thanks! Do you already have a budget range or cap in mind?",
+                message: responseMessage,
                 context: 'Project flow - service type collected, timeline already known',
                 debug: { requestId, responseType: 'PROJECT_SERVICE_COLLECTED_SKIP_TIMELINE', responseTime: Date.now() - startTime }
               }),
@@ -1032,9 +1100,20 @@ export async function POST(req: Request) {
             )
           }
           
+          const responseMessage = "Got it. What's your ideal timeline or deadline for this project?"
+          logger.logAIResponse(userId, responseMessage, {
+            sessionId,
+            projectType: 'project_flow',
+            requestId,
+            responseTime: Date.now() - startTime,
+            isProjectFlow: true,
+            flowStep: 'service_type_collected'
+          }).catch(logError => {
+            console.error('❌ Failed to log project flow response:', logError)
+          })
           return new Response(
             JSON.stringify({
-              message: "Got it. What's your ideal timeline or deadline for this project?",
+              message: responseMessage,
               context: 'Project flow - service type collected',
               debug: { requestId, responseType: 'PROJECT_SERVICE_COLLECTED', responseTime: Date.now() - startTime }
             }),
@@ -1049,9 +1128,20 @@ export async function POST(req: Request) {
             // Skip to goals if budget is already known
             currentProjectFlow.step = 'goals'
             projectService.updateGoals(sessionId, lastMessage.content)
+            const responseMessage = "Understood. What outcomes or goals are you hoping this project achieves? (e.g., increased sales, better UX, new product launch, rebranding)"
+            logger.logAIResponse(userId, responseMessage, {
+              sessionId,
+              projectType: 'project_flow',
+              requestId,
+              responseTime: Date.now() - startTime,
+              isProjectFlow: true,
+              flowStep: 'timeline_collected_skip_budget'
+            }).catch(logError => {
+              console.error('❌ Failed to log project flow response:', logError)
+            })
             return new Response(
               JSON.stringify({
-                message: "Understood. What outcomes or goals are you hoping this project achieves? (e.g., increased sales, better UX, new product launch, rebranding)",
+                message: responseMessage,
                 context: 'Project flow - timeline collected, budget already known',
                 debug: { requestId, responseType: 'PROJECT_TIMELINE_COLLECTED_SKIP_BUDGET', responseTime: Date.now() - startTime }
               }),
@@ -1059,9 +1149,20 @@ export async function POST(req: Request) {
             )
           }
           
+          const responseMessage = "Thanks! Do you already have a budget range or cap in mind?"
+          logger.logAIResponse(userId, responseMessage, {
+            sessionId,
+            projectType: 'project_flow',
+            requestId,
+            responseTime: Date.now() - startTime,
+            isProjectFlow: true,
+            flowStep: 'timeline_collected'
+          }).catch(logError => {
+            console.error('❌ Failed to log project flow response:', logError)
+          })
           return new Response(
             JSON.stringify({
-              message: "Thanks! Do you already have a budget range or cap in mind?",
+              message: responseMessage,
               context: 'Project flow - timeline collected',
               debug: { requestId, responseType: 'PROJECT_TIMELINE_COLLECTED', responseTime: Date.now() - startTime }
             }),
@@ -1078,6 +1179,17 @@ export async function POST(req: Request) {
             const projectData = projectService.completeProjectFlow(sessionId)
             if (projectData) {
               const summary = projectService.generateProjectSummary(projectData)
+              logger.logAIResponse(userId, summary, {
+                sessionId,
+                projectType: 'project_flow',
+                requestId,
+                responseTime: Date.now() - startTime,
+                isProjectFlow: true,
+                flowStep: 'budget_collected_skip_goals',
+                isProjectComplete: true
+              }).catch(logError => {
+                console.error('❌ Failed to log project flow response:', logError)
+              })
               return new Response(
                 JSON.stringify({
                   message: summary,
@@ -1090,9 +1202,20 @@ export async function POST(req: Request) {
             }
           }
           
+          const responseMessage = "Understood. What outcomes or goals are you hoping this project achieves? (e.g., increased sales, better UX, new product launch, rebranding)"
+          logger.logAIResponse(userId, responseMessage, {
+            sessionId,
+            projectType: 'project_flow',
+            requestId,
+            responseTime: Date.now() - startTime,
+            isProjectFlow: true,
+            flowStep: 'budget_collected'
+          }).catch(logError => {
+            console.error('❌ Failed to log project flow response:', logError)
+          })
           return new Response(
             JSON.stringify({
-              message: "Understood. What outcomes or goals are you hoping this project achieves? (e.g., increased sales, better UX, new product launch, rebranding)",
+              message: responseMessage,
               context: 'Project flow - budget collected',
               debug: { requestId, responseType: 'PROJECT_BUDGET_COLLECTED', responseTime: Date.now() - startTime }
             }),
@@ -1106,6 +1229,17 @@ export async function POST(req: Request) {
           const completedProjectData = projectService.completeProjectFlow(sessionId);
           if (completedProjectData) {
             const summary = projectService.generateProjectSummary(completedProjectData);
+            logger.logAIResponse(userId, summary, {
+              sessionId,
+              projectType: 'project_flow',
+              requestId,
+              responseTime: Date.now() - startTime,
+              isProjectFlow: true,
+              flowStep: 'goals_collected',
+              isProjectComplete: true
+            }).catch(logError => {
+              console.error('❌ Failed to log project flow response:', logError)
+            })
             return new Response(
               JSON.stringify({
                 message: summary,
@@ -1122,6 +1256,17 @@ export async function POST(req: Request) {
           const fallbackProjectData = projectService.completeProjectFlow(sessionId)
           if (fallbackProjectData) {
             const summary = projectService.generateProjectSummary(fallbackProjectData)
+            logger.logAIResponse(userId, summary, {
+              sessionId,
+              projectType: 'project_flow',
+              requestId,
+              responseTime: Date.now() - startTime,
+              isProjectFlow: true,
+              flowStep: 'complete_fallback',
+              isProjectComplete: true
+            }).catch(logError => {
+              console.error('❌ Failed to log project flow response:', logError)
+            })
             return new Response(
               JSON.stringify({
                 message: summary,
@@ -1158,6 +1303,18 @@ export async function POST(req: Request) {
         // Generate smart start message that acknowledges existing info
         const projectStartMessage = projectService.generateSmartStartMessage(existingInfo, userProfile)
         
+        // Log the project start response
+        logger.logAIResponse(userId, projectStartMessage, {
+          sessionId,
+          projectType: 'project_started',
+          requestId,
+          responseTime: Date.now() - startTime,
+          isProjectFlow: true,
+          isRFPFollowUp: true
+        }).catch(logError => {
+          console.error('❌ Failed to log project start response:', logError)
+        })
+        
         return new Response(
           JSON.stringify({
             message: projectStartMessage,
@@ -1169,6 +1326,18 @@ export async function POST(req: Request) {
       } else {
         console.log('❌ User declined project process')
         const projectDeclineMessage = "Got it. If you want to get a formal proposal together later, just let me know."
+        
+        // Log the project decline response
+        logger.logAIResponse(userId, projectDeclineMessage, {
+          sessionId,
+          projectType: 'project_declined',
+          requestId,
+          responseTime: Date.now() - startTime,
+          isProjectFlow: true,
+          isRFPFollowUp: true
+        }).catch(logError => {
+          console.error('❌ Failed to log project decline response:', logError)
+        })
         
         return new Response(
           JSON.stringify({
