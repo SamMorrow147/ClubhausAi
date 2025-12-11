@@ -349,10 +349,10 @@ export async function POST(req: Request) {
       console.log('👋 Simple greeting detected - responding with welcome')
       
       const welcomeMessages = [
-        "Hey! Welcome to Clubhaus. How can I help you today?",
-        "Hi there! Welcome to Clubhaus. What can I help you with?",
-        "Hello! Welcome to Clubhaus. How can I assist you today?",
-        "Hey! Welcome to Clubhaus. What brings you here?"
+        "Hey! Welcome to the Club. How can I help you today?",
+        "Hi there! Welcome to the Club. What can I help you with?",
+        "Hello! Welcome to the Club. How can I assist you today?",
+        "Hey! Welcome to the Club. What brings you here?"
       ]
       
       const welcomeMessage = welcomeMessages[Math.floor(Math.random() * welcomeMessages.length)]
@@ -1601,7 +1601,7 @@ RULES:
 - Contact: support@clubhausagency.com
 - Awards: Silver Best Web Design, Bronze Best Creative Services (Minnesota's Best)
 
-GREETINGS: If user just says "hey", "hi", or "hello", respond with a friendly welcome like "Hey! Welcome to Clubhaus. How can I help you today?" - don't immediately jump to "We build websites" or sales talk.
+GREETINGS: If user just says "hey", "hi", or "hello", respond with a friendly welcome like "Hey! Welcome to the Club. How can I help you today?" - don't immediately jump to "We build websites" or sales talk.
 
 CONTACT COLLECTION: When user wants to work with us, collect name → email → phone systematically.
 
