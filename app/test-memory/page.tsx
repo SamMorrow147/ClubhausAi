@@ -96,7 +96,6 @@ export default function TestMemoryPage() {
   const [tokenUsageLoading, setTokenUsageLoading] = useState(false)
   const [tokenUsageError, setTokenUsageError] = useState<string | null>(null)
 
-
   const fetchTokenUsage = async () => {
     setTokenUsageLoading(true)
     setTokenUsageError(null)
@@ -113,27 +112,6 @@ export default function TestMemoryPage() {
       setTokenUsageLoading(false)
     }
   }
-
-  const resetTokenUsage = async () => {
-    setTokenUsageLoading(true)
-    setTokenUsageError(null)
-    try {
-      const response = await fetch('/api/tokens', { method: 'DELETE' })
-      if (!response.ok) {
-        throw new Error('Failed to reset token usage data')
-      }
-      setTokenUsageData(null)
-      alert('Token usage data reset successfully!')
-    } catch (err) {
-      setTokenUsageError(err instanceof Error ? err.message : 'Failed to reset token usage data')
-    } finally {
-      setTokenUsageLoading(false)
-    }
-  }
-
-
-
-
 
   const fetchChatLogs = async () => {
     setLoading(true)
@@ -198,25 +176,6 @@ export default function TestMemoryPage() {
     }
   }
 
-  const deleteChatLogs = async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const response = await fetch('/api/memory?userId=anonymous', { method: 'DELETE' })
-      if (!response.ok) {
-        throw new Error('Failed to delete chat logs')
-      }
-      setChatLogs([])
-      setSessions([])
-      setExpandedSessions(new Set())
-      alert('All chat logs deleted successfully!')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete chat logs')
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const toggleSession = (sessionId: string) => {
     const newExpanded = new Set(expandedSessions)
     if (newExpanded.has(sessionId)) {
@@ -272,23 +231,6 @@ export default function TestMemoryPage() {
             )}
           </div>
         )}
-
-        <div className="mb-6">
-          <button onClick={fetchChatLogs} disabled={loading} className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 px-4 py-2 rounded mr-4">
-            {loading ? 'Loading...' : 'Refresh Chat Logs'}
-          </button>
-          <button onClick={deleteChatLogs} disabled={loading} className="bg-red-600 hover:bg-red-700 disabled:bg-gray-600 px-4 py-2 rounded mr-4">
-            {loading ? 'Deleting...' : 'Delete All Chat Logs'}
-          </button>
-          <button onClick={fetchTokenUsage} disabled={tokenUsageLoading} className="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 px-4 py-2 rounded mr-4">
-            {tokenUsageLoading ? 'Loading...' : 'Refresh Token Usage'}
-          </button>
-          <button onClick={resetTokenUsage} disabled={tokenUsageLoading} className="bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 px-4 py-2 rounded">
-            {tokenUsageLoading ? 'Resetting...' : 'Reset Token Data'}
-          </button>
-        </div>
-
-
 
 
 
@@ -601,10 +543,9 @@ export default function TestMemoryPage() {
           <h3 className="text-lg font-semibold mb-4">How to Use</h3>
           <ol className="list-decimal list-inside space-y-2 text-gray-300">
             <li>Go to the main chat page and have a conversation with the AI</li>
-            <li>Come back to this page and click "Refresh Chat Logs"</li>
+            <li>Return here to see conversation sessions and token usage</li>
             <li>Click on any session to expand and view the full conversation</li>
             <li>Each session shows the complete back-and-forth between you and the AI</li>
-            <li>Use the delete button to clear all logs when testing</li>
             {environmentInfo?.isVercel && (
               <li className="text-yellow-400">
                 ⚠️ <strong>Vercel Note:</strong> Logs are stored in-memory and will reset between deployments

@@ -1,6 +1,7 @@
+import { NextRequest } from 'next/server'
 import TokenUsageService, { DailyTokenUsage } from '../../../lib/tokenUsageService'
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   try {
     const tokenUsageService = TokenUsageService.getInstance()
     
@@ -73,7 +74,7 @@ export async function GET(req: Request) {
   }
 }
 
-export async function DELETE(req: Request) {
+export async function DELETE(req: NextRequest) {
   try {
     const tokenUsageService = TokenUsageService.getInstance()
 
