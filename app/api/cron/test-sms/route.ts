@@ -1,9 +1,9 @@
 import { NextRequest } from 'next/server'
-import { sendSms } from '../../../../lib/twilioNotifier'
+import { sendEmail } from '../../../../lib/twilioNotifier'
 
 /**
  * GET /api/cron/test-sms
- * Sends a quick test SMS to CONVERSATION_NOTIFY_PHONE to verify Twilio is configured.
+ * Sends a test email to CONVERSATION_NOTIFY_EMAIL to verify Resend is configured.
  * Protected by x-cron-secret header.
  */
 export async function GET(req: NextRequest) {
@@ -18,15 +18,17 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const ok = await sendSms('CH Bot test message - Twilio is working! 🎉')
+  const ok = await sendEmail(
+    'CH Bot – Test Notification',
+    'This is a test email from your CH Chatbot notification system. If you received this, email notifications are working!'
+  )
 
   return new Response(
     JSON.stringify({
       ok,
-      to: process.env.CONVERSATION_NOTIFY_PHONE || 'NOT SET',
-      hasAccountSid: !!process.env.TWILIO_ACCOUNT_SID,
-      hasAuthToken: !!process.env.TWILIO_AUTH_TOKEN,
-      hasMessagingService: !!process.env.TWILIO_MESSAGING_SERVICE_SID,
+      to: process.env.CONVERSATION_NOTIFY_EMAIL || 'NOT SET',
+      hasResendKey: !!process.env.RESEND_API_KEY,
+      hasFromEmail: !!process.env.RESEND_FROM_EMAIL,
     }),
     { status: ok ? 200 : 500, headers: { 'Content-Type': 'application/json' } }
   )

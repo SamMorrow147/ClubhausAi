@@ -1,5 +1,5 @@
 import { neon } from '@neondatabase/serverless'
-import twilio from 'twilio'
+import { Resend } from 'resend'
 
 export interface SessionSummary {
   sessionId: string
@@ -109,25 +109,31 @@ export async function markSessionsNotified(sessionIds: string[]): Promise<void> 
 }
 
 /**
- * Formats a session into a concise SMS-friendly back-and-forth
+ * Formats a session into a readable email body (plain text) and returns
+ * both the subject line and the body.
  */
-export function formatSessionSummary(session: SessionSummary): string {
+export function formatSessionEmail(session: SessionSummary): { subject: string; body: string } {
   const dateStr = session.startTime.toLocaleDateString('en-US', {
-    weekday: 'short',
+    weekday: 'long',
     month: 'short',
     day: 'numeric',
+    year: 'numeric',
   })
   const timeStr = session.startTime.toLocaleTimeString('en-US', {
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
+    timeZoneName: 'short',
   })
 
+  const subject = `CH Chatbot Exchange (${dateStr} at ${timeStr})`
+
   const lines: string[] = [
-    `CH Bot – New Conversation`,
-    `${dateStr} at ${timeStr}`,
-    `(${session.messageCount} messages)`,
-    `──────────────────`,
+    `New conversation on ${dateStr} at ${timeStr}`,
+    `${session.messageCount} messages`,
+    ``,
+    `─────────────────────────────────`,
+    ``,
   ]
 
   for (const msg of session.messages) {
@@ -136,41 +142,44 @@ export function formatSessionSummary(session: SessionSummary): string {
       minute: '2-digit',
       hour12: true,
     })
-    const label = msg.role === 'user' ? 'Visitor' : 'Bot'
-    // Truncate long messages to 200 chars so the SMS stays readable
-    const text =
-      msg.content.length > 200 ? msg.content.substring(0, 197) + '...' : msg.content
-    lines.push(`[${time}] ${label}: ${text}`)
+    const label = msg.role === 'user' ? 'Visitor' : 'CH Bot'
+    lines.push(`[${time}] ${label}:`)
+    lines.push(msg.content)
+    lines.push('')
   }
 
-  return lines.join('\n')
+  return { subject, body: lines.join('\n') }
 }
 
 /**
- * Sends an SMS via Twilio using the MessagingServiceSid pattern from the API explorer
+ * Sends an email notification via Resend
  */
-export async function sendSms(body: string): Promise<boolean> {
-  const accountSid = process.env.TWILIO_ACCOUNT_SID
-  const authToken = process.env.TWILIO_AUTH_TOKEN
-  const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID
-  const to = process.env.CONVERSATION_NOTIFY_PHONE
+export async function sendEmail(subject: string, body: string): Promise<boolean> {
+  const apiKey = process.env.RESEND_API_KEY
+  const to = process.env.CONVERSATION_NOTIFY_EMAIL
+  const from = process.env.RESEND_FROM_EMAIL || 'CH Bot <onboarding@resend.dev>'
 
-  if (!accountSid || !authToken || !messagingServiceSid || !to) {
-    console.error('❌ Missing Twilio env vars (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_MESSAGING_SERVICE_SID, CONVERSATION_NOTIFY_PHONE)')
+  if (!apiKey || !to) {
+    console.error('❌ Missing email env vars (RESEND_API_KEY, CONVERSATION_NOTIFY_EMAIL)')
     return false
   }
 
   try {
-    const client = twilio(accountSid, authToken)
-    await client.messages.create({
-      body,
-      messagingServiceSid,
+    const resend = new Resend(apiKey)
+    const { error } = await resend.emails.send({
+      from,
       to,
+      subject,
+      text: body,
     })
-    console.log('✅ SMS sent to', to)
+    if (error) {
+      console.error('❌ Resend email failed:', error)
+      return false
+    }
+    console.log('✅ Email sent to', to)
     return true
   } catch (error) {
-    console.error('❌ Twilio SMS failed:', error)
+    console.error('❌ Email send error:', error)
     return false
   }
 }

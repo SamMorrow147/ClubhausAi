@@ -3,20 +3,20 @@ import {
   ensureNotifiedSessionsTable,
   getSessionsToNotify,
   markSessionsNotified,
-  formatSessionSummary,
-  sendSms,
+  formatSessionEmail,
+  sendEmail,
 } from '../../../../lib/twilioNotifier'
 
 /**
  * GET /api/cron/send-summaries
  *
- * Called by an external cron (e.g. cron-job.org or Vercel Cron) every 5-10 minutes.
+ * Called by an external cron (e.g. cron-job.org) every 10 minutes.
  * Requires header: x-cron-secret: <CRON_SECRET env var>
  *
  * Finds conversation sessions that:
  *   - ended (no new message) more than 5 minutes ago
- *   - haven't already been summarised
- * Then sends a concise back-and-forth SMS for each via Twilio.
+ *   - haven't already been notified
+ * Then sends a concise back-and-forth email for each via Resend.
  */
 export async function GET(req: NextRequest) {
   // --- Auth check ---
@@ -32,10 +32,8 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // Make sure the notified_sessions table exists
     await ensureNotifiedSessionsTable()
 
-    // Find sessions idle for 5+ minutes that haven't been notified
     const sessions = await getSessionsToNotify(5)
 
     if (!sessions.length) {
@@ -49,8 +47,8 @@ export async function GET(req: NextRequest) {
     const failed: string[] = []
 
     for (const session of sessions) {
-      const text = formatSessionSummary(session)
-      const ok = await sendSms(text)
+      const { subject, body } = formatSessionEmail(session)
+      const ok = await sendEmail(subject, body)
       if (ok) {
         notified.push(session.sessionId)
       } else {
@@ -58,12 +56,11 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Only mark sessions as notified if the SMS actually sent
     if (notified.length) {
       await markSessionsNotified(notified)
     }
 
-    console.log(`📱 Cron: sent ${notified.length} summaries, ${failed.length} failed`)
+    console.log(`📧 Cron: sent ${notified.length} email summaries, ${failed.length} failed`)
 
     return new Response(
       JSON.stringify({
