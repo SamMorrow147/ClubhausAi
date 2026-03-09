@@ -51,7 +51,7 @@ export async function getSessionsToNotify(idleMinutes = 5): Promise<SessionSumma
       -- Last message is older than idleMinutes
       AND c.session_id NOT IN (
         SELECT session_id FROM chat_logs
-        WHERE created_at > NOW() - (${idleMinutes} || ' minutes')::interval
+        WHERE created_at > NOW() - (${idleMinutes} * INTERVAL '1 minute')
           AND content NOT LIKE '[PROFILE_UPDATE]%'
       )
       -- Not already notified
