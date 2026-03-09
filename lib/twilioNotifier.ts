@@ -157,7 +157,7 @@ export function formatSessionEmail(session: SessionSummary): { subject: string; 
 export async function sendEmail(subject: string, body: string): Promise<boolean> {
   const apiKey = process.env.RESEND_API_KEY
   const to = process.env.CONVERSATION_NOTIFY_EMAIL
-  const from = process.env.RESEND_FROM_EMAIL || 'CH Bot <onboarding@resend.dev>'
+  const from = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev'
 
   if (!apiKey || !to) {
     console.error('❌ Missing email env vars (RESEND_API_KEY, CONVERSATION_NOTIFY_EMAIL)')
